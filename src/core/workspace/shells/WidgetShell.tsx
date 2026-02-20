@@ -7,9 +7,17 @@ import { createThresholdDragSession } from "../interaction";
 
 type WidgetShellProps = {
   widget: WidgetLayout;
+  onDragMove?: (
+    widgetId: string,
+    nextX: number,
+    nextY: number,
+    pointerX: number,
+    pointerY: number,
+  ) => void;
+  onDragEnd?: (widgetId: string, pointerX: number, pointerY: number, didDrag: boolean) => void;
 };
 
-export function WidgetShell({ widget }: WidgetShellProps) {
+export function WidgetShell({ widget, onDragMove, onDragEnd }: WidgetShellProps) {
   const module = moduleRegistryById[widget.moduleId];
   const closeWidget = useLayoutStore((state) => state.closeWidget);
   const updateWidget = useLayoutStore((state) => state.updateWidget);
@@ -24,16 +32,20 @@ export function WidgetShell({ widget }: WidgetShellProps) {
         bringToFront(widget.id);
         dragOriginRef.current = { x: widget.x, y: widget.y };
       },
-      onMove: (dx, dy) => {
+      onMove: (dx, dy, pointerX, pointerY) => {
         const dragOrigin = dragOriginRef.current;
         if (!dragOrigin) return;
+        const nextX = Math.max(0, dragOrigin.x + dx);
+        const nextY = Math.max(0, dragOrigin.y + dy);
         updateWidget(widget.id, {
-          x: Math.max(0, dragOrigin.x + dx),
-          y: Math.max(0, dragOrigin.y + dy),
+          x: nextX,
+          y: nextY,
         });
+        onDragMove?.(widget.id, nextX, nextY, pointerX, pointerY);
       },
-      onEnd: () => {
+      onEnd: (pointerX, pointerY, didDrag) => {
         dragOriginRef.current = null;
+        onDragEnd?.(widget.id, pointerX, pointerY, didDrag);
       },
     });
   };

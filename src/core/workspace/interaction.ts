@@ -23,8 +23,8 @@ function isBlockedDragTarget(target: EventTarget | null) {
 
 type DragSessionOptions = {
   onStart: () => void;
-  onMove: (dx: number, dy: number) => void;
-  onEnd?: () => void;
+  onMove: (dx: number, dy: number, pointerX: number, pointerY: number) => void;
+  onEnd?: (pointerX: number, pointerY: number, didDrag: boolean) => void;
 };
 
 export function createThresholdDragSession(
@@ -50,15 +50,15 @@ export function createThresholdDragSession(
       moveEvent.preventDefault();
       options.onStart();
     }
-    options.onMove(dx, dy);
+    options.onMove(dx, dy, moveEvent.clientX, moveEvent.clientY);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (upEvent: PointerEvent) => {
     if (dragging && element.hasPointerCapture(pointerId)) {
       element.releasePointerCapture(pointerId);
     }
     cleanup();
-    options.onEnd?.();
+    options.onEnd?.(upEvent.clientX, upEvent.clientY, dragging);
   };
 
   const cleanup = () => {

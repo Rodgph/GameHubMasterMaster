@@ -6,6 +6,66 @@
   background: transparent;
 }
 
+.dock-root {
+  position: absolute;
+  inset: 0;
+  padding: 6px;
+}
+
+.dock-panel {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.dock-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dock-header button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  height: 28px;
+  padding: 0 10px;
+  cursor: pointer;
+  background: var(--bg-module);
+  color: var(--text-primary);
+}
+
+.dock-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  background: var(--bg-module);
+}
+
+.dock-split {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 6px;
+}
+
+.dock-row {
+  flex-direction: row;
+}
+
+.dock-column {
+  flex-direction: column;
+}
+
 .widget-shell {
   position: absolute;
   display: flex;
@@ -127,4 +187,49 @@
   height: 1px;
   background: var(--border-subtle);
   margin: 6px 0;
+}
+
+.dock-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dock-zone {
+  position: absolute;
+  border: 1px solid var(--border-subtle);
+  background: rgba(2, 2, 2, 0.2);
+  transition: background 120ms ease;
+}
+
+.dock-zone.active {
+  background: rgba(2, 2, 2, 0.65);
+}
+
+.dock-zone-left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+}
+
+.dock-zone-right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+}
+
+.dock-zone-top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 24px;
+}
+
+.dock-zone-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
 }

@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ModuleId, ModuleMode } from "../modules/types";
-import { createEmptyDockTree } from "./dockTree";
+import { createEmptyDockTree, createLeaf, removeLeafByWidgetId, splitRoot } from "./dockTree";
 import type { DockTree } from "./dockTree";
 import { moduleRegistryById } from "../modules/registry";
+
+export type DockEdge = "left" | "right" | "top" | "bottom";
 
 export type WidgetLayout = {
   id: string;
@@ -23,6 +25,8 @@ type LayoutState = {
   closeWidget: (id: string) => void;
   updateWidget: (id: string, patch: Partial<WidgetLayout>) => void;
   bringToFront: (id: string) => void;
+  dockWidget: (id: string, edge: DockEdge) => void;
+  undockWidget: (id: string) => void;
   resetLayout: () => void;
 };
 
@@ -61,8 +65,6 @@ export const useLayoutStore = create<LayoutState>()(
           };
           return { widgets: [...state.widgets, widget] };
         }),
-      closeWidget: (id) =>
-        set((state) => ({ widgets: state.widgets.filter((widget) => widget.id !== id) })),
       updateWidget: (id, patch) =>
         set((state) => ({
           widgets: state.widgets.map((widget) =>
@@ -78,7 +80,48 @@ export const useLayoutStore = create<LayoutState>()(
             ),
           };
         }),
+      dockWidget: (id, edge) =>
+        set((state) => {
+          const target = state.widgets.find((widget) => widget.id === id);
+          if (!target) return state;
+          if (target.mode === "dock") return state;
+
+          const leaf = createLeaf(id);
+          const direction = edge === "left" || edge === "right" ? "row" : "column";
+          const position = edge === "left" || edge === "top" ? "start" : "end";
+
+          return {
+            widgets: state.widgets.map((widget) =>
+              widget.id === id ? { ...widget, mode: "dock" } : widget,
+            ),
+            dockTree: splitRoot(state.dockTree, direction, leaf, position),
+          };
+        }),
+      undockWidget: (id) =>
+        set((state) => ({
+          widgets: state.widgets.map((widget) =>
+            widget.id === id
+              ? {
+                  ...widget,
+                  mode: "widget",
+                  x: 80,
+                  y: 80,
+                  z: getNextZ(state.widgets),
+                }
+              : widget,
+          ),
+          dockTree: {
+            root: removeLeafByWidgetId(state.dockTree.root, id),
+          },
+        })),
       resetLayout: () => set({ widgets: [], dockTree: createEmptyDockTree() }),
+      closeWidget: (id) =>
+        set((state) => ({
+          widgets: state.widgets.filter((widget) => widget.id !== id),
+          dockTree: {
+            root: removeLeafByWidgetId(state.dockTree.root, id),
+          },
+        })),
     }),
     {
       name: "master_master_layout_v1",
