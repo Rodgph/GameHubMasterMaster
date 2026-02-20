@@ -79,9 +79,12 @@ export function WidgetShell({ widget, onDragMove, onDragEnd }: WidgetShellProps)
         height: `${widget.h}px`,
         zIndex: widget.z,
       }}
-      onPointerDown={() => bringToFront(widget.id)}
+      onPointerDown={(event) => {
+        bringToFront(widget.id);
+        startMove(event);
+      }}
     >
-      <header className="widget-header" onPointerDown={startMove}>
+      <header className="widget-header">
         <span>{module.title}</span>
         <button type="button" data-no-drag="true" onClick={() => closeWidget(widget.id)}>
           Fechar
@@ -90,7 +93,7 @@ export function WidgetShell({ widget, onDragMove, onDragEnd }: WidgetShellProps)
       <div className="widget-content">
         <ModuleComponent />
       </div>
-      <div className="widget-resize-handle" onPointerDown={startResize} />
+      <div className="widget-resize-handle" data-no-drag="true" onPointerDown={startResize} />
     </article>
   );
 }
