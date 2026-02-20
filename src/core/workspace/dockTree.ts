@@ -247,3 +247,104 @@ export function updateLeafActive(
     children: [nextLeft as DockNode, nextRight as DockNode],
   };
 }
+
+export function moveTabWithinLeaf(
+  root: DockNode | null,
+  leafId: string,
+  widgetId: string,
+  toIndex: number,
+): DockNode | null {
+  if (!root) return null;
+  if (root.kind === "leaf") {
+    if (root.id !== leafId) return root;
+    const currentIndex = root.widgetIds.indexOf(widgetId);
+    if (currentIndex === -1) return root;
+    const nextIds = [...root.widgetIds];
+    nextIds.splice(currentIndex, 1);
+    const clamped = Math.max(0, Math.min(nextIds.length, toIndex));
+    nextIds.splice(clamped, 0, widgetId);
+    return {
+      ...root,
+      widgetIds: nextIds,
+      activeWidgetId: root.activeWidgetId,
+    };
+  }
+
+  const nextLeft = moveTabWithinLeaf(root.children[0], leafId, widgetId, toIndex);
+  const nextRight = moveTabWithinLeaf(root.children[1], leafId, widgetId, toIndex);
+  if (nextLeft === root.children[0] && nextRight === root.children[1]) return root;
+
+  return {
+    ...root,
+    children: [nextLeft as DockNode, nextRight as DockNode],
+  };
+}
+
+export function removeTabFromLeaf(
+  root: DockNode | null,
+  leafId: string,
+  widgetId: string,
+): DockNode | null {
+  if (!root) return null;
+  if (root.kind === "leaf") {
+    if (root.id !== leafId) return root;
+    if (!root.widgetIds.includes(widgetId)) return root;
+    const nextIds = root.widgetIds.filter((id) => id !== widgetId);
+    if (nextIds.length === 0) return null;
+    return {
+      ...root,
+      widgetIds: nextIds,
+      activeWidgetId: root.activeWidgetId === widgetId ? nextIds[0] : root.activeWidgetId,
+    };
+  }
+
+  const left = removeTabFromLeaf(root.children[0], leafId, widgetId);
+  const right = removeTabFromLeaf(root.children[1], leafId, widgetId);
+  if (!left && !right) return null;
+  if (!left) return right;
+  if (!right) return left;
+  if (left === root.children[0] && right === root.children[1]) return root;
+
+  return {
+    ...root,
+    children: [left, right],
+  };
+}
+
+export function insertTabIntoLeafById(
+  root: DockNode | null,
+  leafId: string,
+  widgetId: string,
+  index?: number,
+): DockNode | null {
+  if (!root) return null;
+  if (root.kind === "leaf") {
+    if (root.id !== leafId) return root;
+    const nextIds = root.widgetIds.filter((id) => id !== widgetId);
+    const insertIndex = Math.max(0, Math.min(nextIds.length, index ?? nextIds.length));
+    nextIds.splice(insertIndex, 0, widgetId);
+    return {
+      ...root,
+      widgetIds: nextIds,
+      activeWidgetId: widgetId,
+    };
+  }
+
+  const nextLeft = insertTabIntoLeafById(root.children[0], leafId, widgetId, index);
+  if (nextLeft !== root.children[0]) {
+    return {
+      ...root,
+      children: [nextLeft as DockNode, root.children[1]],
+    };
+  }
+
+  const nextRight = insertTabIntoLeafById(root.children[1], leafId, widgetId, index);
+  if (nextRight !== root.children[1]) {
+    return {
+      ...root,
+      children: [root.children[0], nextRight as DockNode],
+    };
+  }
+
+  return root;
+}

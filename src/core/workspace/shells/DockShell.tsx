@@ -22,9 +22,29 @@ type DockShellProps = {
   widgetsById: Record<string, WidgetLayout>;
   onDockDragMove: (movingId: string, x: number, y: number) => void;
   onDockDragEnd: (movingId: string, x: number, y: number, didDrag: boolean) => void;
+  onDockTabDragMove: (payload: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+  }) => void;
+  onDockTabDragEnd: (payload: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+    didDrag: boolean;
+  }) => void;
 };
 
-export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: DockShellProps) {
+export function DockShell({
+  node,
+  widgetsById,
+  onDockDragMove,
+  onDockDragEnd,
+  onDockTabDragMove,
+  onDockTabDragEnd,
+}: DockShellProps) {
   const closeDockTab = useLayoutStore((state) => state.closeDockTab);
   const setActiveDockTab = useLayoutStore((state) => state.setActiveDockTab);
   const setDockSplitRatio = useLayoutStore((state) => state.setDockSplitRatio);
@@ -128,6 +148,61 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
     window.addEventListener("pointercancel", onPointerUp);
   };
 
+  const startTabDrag = (event: ReactPointerEvent<HTMLElement>, leafId: string, tabId: string) => {
+    if (event.button !== 0) return;
+    if (!(event.target instanceof HTMLElement)) return;
+    if (event.target.closest(INTERACTIVE_SELECTOR)) return;
+
+    const element = event.currentTarget;
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      element.classList.remove("dragging");
+    };
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (!dragging) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        dragging = true;
+        element.classList.add("dragging");
+        element.setPointerCapture(pointerId);
+        moveEvent.preventDefault();
+      }
+      onDockTabDragMove({
+        leafId,
+        tabId,
+        pointerX: moveEvent.clientX,
+        pointerY: moveEvent.clientY,
+      });
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (dragging && element.hasPointerCapture(pointerId)) {
+        element.releasePointerCapture(pointerId);
+      }
+      cleanup();
+      onDockTabDragEnd({
+        leafId,
+        tabId,
+        pointerX: upEvent.clientX,
+        pointerY: upEvent.clientY,
+        didDrag: dragging,
+      });
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  };
+
   if (node.kind === "leaf") {
     const activeWidget = widgetsById[node.activeWidgetId];
     if (!activeWidget) return null;
@@ -141,7 +216,7 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
           className="dock-header"
           onPointerDown={(event) => startDockHeaderDrag(event, activeWidget.id)}
         >
-          <div className="dock-tabs" data-no-drag="true">
+          <div className="dock-tabs" data-dock-tabs-leaf-id={node.id} data-no-drag="true">
             {node.widgetIds
               .map((widgetId) => widgetsById[widgetId])
               .filter((widget): widget is WidgetLayout => Boolean(widget))
@@ -153,7 +228,9 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
                     key={widget.id}
                     type="button"
                     className={`dock-tab ${isActive ? "active" : ""}`}
-                    data-no-drag="true"
+                    data-dock-leaf-id={node.id}
+                    data-dock-tab-id={widget.id}
+                    onPointerDown={(event) => startTabDrag(event, node.id, widget.id)}
                     onClick={() => setActiveDockTab(node.id, widget.id)}
                   >
                     <span>{tabModule.title}</span>
@@ -187,6 +264,8 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
           widgetsById={widgetsById}
           onDockDragMove={onDockDragMove}
           onDockDragEnd={onDockDragEnd}
+          onDockTabDragMove={onDockTabDragMove}
+          onDockTabDragEnd={onDockTabDragEnd}
         />
       </div>
       <div
@@ -200,6 +279,8 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
           widgetsById={widgetsById}
           onDockDragMove={onDockDragMove}
           onDockDragEnd={onDockDragEnd}
+          onDockTabDragMove={onDockTabDragMove}
+          onDockTabDragEnd={onDockTabDragEnd}
         />
       </div>
     </section>

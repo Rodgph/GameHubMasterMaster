@@ -6,7 +6,10 @@ import {
   createLeaf,
   insertAsTabAtLeaf,
   insertSplitAtLeaf,
+  insertTabIntoLeafById,
+  moveTabWithinLeaf,
   moveLeafToSplit,
+  removeTabFromLeaf,
   removeLeafByWidgetId,
   splitRoot,
   updateLeafActive,
@@ -40,6 +43,9 @@ type LayoutState = {
   dockAsTab: (movingId: string, targetWidgetId: string) => void;
   setActiveDockTab: (leafId: string, widgetId: string) => void;
   closeDockTab: (leafId: string, widgetId: string) => void;
+  reorderDockTab: (leafId: string, widgetId: string, toIndex: number) => void;
+  detachDockTab: (leafId: string, widgetId: string) => void;
+  attachDockTabToLeaf: (leafId: string, widgetId: string, index?: number) => void;
   moveDockedWidget: (movingId: string, targetId: string, side: DockEdge) => void;
   setDockSplitRatio: (splitId: string, ratio: number) => void;
   undockWidget: (id: string) => void;
@@ -168,6 +174,27 @@ export const useLayoutStore = create<LayoutState>()(
           widgets: state.widgets.filter((widget) => widget.id !== widgetId),
           dockTree: {
             root: removeLeafByWidgetId(state.dockTree.root, widgetId),
+          },
+        })),
+      reorderDockTab: (leafId, widgetId, toIndex) =>
+        set((state) => ({
+          dockTree: {
+            root: moveTabWithinLeaf(state.dockTree.root, leafId, widgetId, toIndex),
+          },
+        })),
+      detachDockTab: (leafId, widgetId) =>
+        set((state) => ({
+          dockTree: {
+            root: removeTabFromLeaf(state.dockTree.root, leafId, widgetId),
+          },
+        })),
+      attachDockTabToLeaf: (leafId, widgetId, index) =>
+        set((state) => ({
+          widgets: state.widgets.map((widget) =>
+            widget.id === widgetId ? { ...widget, mode: "dock" } : widget,
+          ),
+          dockTree: {
+            root: insertTabIntoLeafById(state.dockTree.root, leafId, widgetId, index),
           },
         })),
       moveDockedWidget: (movingId, targetId, side) =>

@@ -43,6 +43,13 @@ type DockDragSnap = {
   rect: PanelOverlayRect;
 } | null;
 
+type TabDragSnap =
+  | { kind: "reorder"; leafId: string; tabId: string; toIndex: number }
+  | { kind: "panel-split"; leafId: string; tabId: string; targetId: string; side: DockEdge }
+  | { kind: "panel-tab"; leafId: string; tabId: string; targetId: string }
+  | { kind: "undock"; leafId: string; tabId: string }
+  | null;
+
 export function Workspace() {
   const widgets = useLayoutStore((state) => state.widgets);
   const dockTree = useLayoutStore((state) => state.dockTree);
@@ -50,12 +57,15 @@ export function Workspace() {
   const dockWidget = useLayoutStore((state) => state.dockWidget);
   const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
   const dockAsTab = useLayoutStore((state) => state.dockAsTab);
+  const reorderDockTab = useLayoutStore((state) => state.reorderDockTab);
+  const detachDockTab = useLayoutStore((state) => state.detachDockTab);
   const moveDockedWidget = useLayoutStore((state) => state.moveDockedWidget);
   const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
   const canvasRef = useRef<HTMLElement | null>(null);
   const snapRef = useRef<SnapState>(null);
   const dockDragRef = useRef<DockDragSnap>(null);
+  const tabDragRef = useRef<TabDragSnap>(null);
   const [snapState, setSnapState] = useState<SnapState | null>(null);
   const [dockDragSnap, setDockDragSnap] = useState<DockDragSnap>(null);
 
@@ -285,6 +295,96 @@ export function Workspace() {
     setDockDragSnap(null);
   };
 
+  const getReorderIndexInLeaf = (leafId: string, pointerX: number) => {
+    const tabs = Array.from(
+      document.querySelectorAll(`[data-dock-leaf-id="${leafId}"]`),
+    ) as HTMLElement[];
+    if (tabs.length === 0) return 0;
+    let index = tabs.length;
+    for (let i = 0; i < tabs.length; i += 1) {
+      const rect = tabs[i].getBoundingClientRect();
+      if (pointerX < rect.left + rect.width / 2) {
+        index = i;
+        break;
+      }
+    }
+    return index;
+  };
+
+  const handleDockTabDragMove = ({
+    leafId,
+    tabId,
+    pointerX,
+    pointerY,
+  }: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+  }) => {
+    let next: TabDragSnap = null;
+
+    if (isOutsideDockRootWithMargin(pointerX, pointerY)) {
+      next = { kind: "undock", leafId, tabId };
+    } else {
+      const topEl = document.elementFromPoint(pointerX, pointerY) as HTMLElement | null;
+      const sameLeafTab = topEl?.closest(`[data-dock-leaf-id="${leafId}"]`);
+      const sameLeafTabs = topEl?.closest(`[data-dock-tabs-leaf-id="${leafId}"]`);
+      if (sameLeafTab || sameLeafTabs) {
+        next = { kind: "reorder", leafId, tabId, toIndex: getReorderIndexInLeaf(leafId, pointerX) };
+      } else {
+        const panelEl = getDockPanelAtPoint(pointerX, pointerY);
+        if (panelEl) {
+          const targetId = panelEl.dataset.dockWidgetId;
+          const intent = getPanelDropIntent(panelEl, pointerX, pointerY);
+          if (targetId && intent) {
+            next =
+              intent.kind === "panel-split"
+                ? { kind: "panel-split", leafId, tabId, targetId, side: intent.side }
+                : { kind: "panel-tab", leafId, tabId, targetId };
+          }
+        }
+      }
+    }
+
+    tabDragRef.current = next;
+  };
+
+  const handleDockTabDragEnd = ({
+    leafId,
+    tabId,
+    pointerX,
+    pointerY,
+    didDrag,
+  }: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+    didDrag: boolean;
+  }) => {
+    if (!didDrag) {
+      tabDragRef.current = null;
+      return;
+    }
+
+    const snap = tabDragRef.current;
+    if (snap?.kind === "reorder" && snap.leafId === leafId && snap.tabId === tabId) {
+      reorderDockTab(leafId, tabId, snap.toIndex);
+    } else if (snap?.kind === "panel-tab" && snap.leafId === leafId && snap.tabId === tabId) {
+      detachDockTab(leafId, tabId);
+      dockAsTab(tabId, snap.targetId);
+    } else if (snap?.kind === "panel-split" && snap.leafId === leafId && snap.tabId === tabId) {
+      detachDockTab(leafId, tabId);
+      moveDockedWidget(tabId, snap.targetId, snap.side);
+    } else if (snap?.kind === "undock" && snap.leafId === leafId && snap.tabId === tabId) {
+      detachDockTab(leafId, tabId);
+      undockWidgetAt(tabId, pointerX - 200, pointerY - 22);
+    }
+
+    tabDragRef.current = null;
+  };
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
@@ -296,6 +396,8 @@ export function Workspace() {
                 widgetsById={widgetsById}
                 onDockDragMove={handleDockDragMove}
                 onDockDragEnd={handleDockDragEnd}
+                onDockTabDragMove={handleDockTabDragMove}
+                onDockTabDragEnd={handleDockTabDragEnd}
               />
             </section>
           ) : null}

@@ -56,11 +56,21 @@
   height: 28px;
   padding: 0 8px;
   border-radius: 6px;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .dock-tab.active {
   background: var(--bg-surface);
+}
+
+.dock-tab.dragging {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.dock-tab-drop-indicator {
+  height: 2px;
+  background: var(--text-primary);
 }
 
 .dock-tab-close {
