@@ -4,10 +4,12 @@ import type { ModuleId, ModuleMode } from "../modules/types";
 import {
   createEmptyDockTree,
   createLeaf,
+  insertAsTabAtLeaf,
   insertSplitAtLeaf,
   moveLeafToSplit,
   removeLeafByWidgetId,
   splitRoot,
+  updateLeafActive,
   updateSplitRatio,
 } from "./dockTree";
 import type { DockTree } from "./dockTree";
@@ -35,6 +37,9 @@ type LayoutState = {
   bringToFront: (id: string) => void;
   dockWidget: (id: string, edge: DockEdge) => void;
   dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
+  dockAsTab: (movingId: string, targetWidgetId: string) => void;
+  setActiveDockTab: (leafId: string, widgetId: string) => void;
+  closeDockTab: (leafId: string, widgetId: string) => void;
   moveDockedWidget: (movingId: string, targetId: string, side: DockEdge) => void;
   setDockSplitRatio: (splitId: string, ratio: number) => void;
   undockWidget: (id: string) => void;
@@ -134,6 +139,37 @@ export const useLayoutStore = create<LayoutState>()(
             },
           };
         }),
+      dockAsTab: (movingId, targetWidgetId) =>
+        set((state) => {
+          const movingWidget = state.widgets.find((widget) => widget.id === movingId);
+          if (!movingWidget) return state;
+
+          const cleanedRoot = removeLeafByWidgetId(state.dockTree.root, movingId);
+          const nextRoot = insertAsTabAtLeaf(cleanedRoot, targetWidgetId, movingId) ?? cleanedRoot;
+          if (nextRoot === cleanedRoot) return state;
+
+          return {
+            widgets: state.widgets.map((widget) =>
+              widget.id === movingId ? { ...widget, mode: "dock" } : widget,
+            ),
+            dockTree: {
+              root: nextRoot,
+            },
+          };
+        }),
+      setActiveDockTab: (leafId, widgetId) =>
+        set((state) => ({
+          dockTree: {
+            root: updateLeafActive(state.dockTree.root, leafId, widgetId),
+          },
+        })),
+      closeDockTab: (_leafId, widgetId) =>
+        set((state) => ({
+          widgets: state.widgets.filter((widget) => widget.id !== widgetId),
+          dockTree: {
+            root: removeLeafByWidgetId(state.dockTree.root, widgetId),
+          },
+        })),
       moveDockedWidget: (movingId, targetId, side) =>
         set((state) => ({
           dockTree: {

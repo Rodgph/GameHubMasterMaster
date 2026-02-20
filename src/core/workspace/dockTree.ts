@@ -5,7 +5,8 @@ export type InsertPosition = "start" | "end";
 export type DockLeaf = {
   id: DockNodeId;
   kind: "leaf";
-  widgetId: string;
+  widgetIds: string[];
+  activeWidgetId: string;
 };
 
 export type DockSplit = {
@@ -30,7 +31,8 @@ export function createLeaf(widgetId: string): DockLeaf {
   return {
     id: crypto.randomUUID(),
     kind: "leaf",
-    widgetId,
+    widgetIds: [widgetId],
+    activeWidgetId: widgetId,
   };
 }
 
@@ -62,7 +64,14 @@ export function removeLeafByWidgetId(node: DockNode | null, widgetId: string): D
   if (!node) return null;
 
   if (node.kind === "leaf") {
-    return node.widgetId === widgetId ? null : node;
+    if (!node.widgetIds.includes(widgetId)) return node;
+    const nextWidgetIds = node.widgetIds.filter((id) => id !== widgetId);
+    if (nextWidgetIds.length === 0) return null;
+    return {
+      ...node,
+      widgetIds: nextWidgetIds,
+      activeWidgetId: node.activeWidgetId === widgetId ? nextWidgetIds[0] : node.activeWidgetId,
+    };
   }
 
   const left = removeLeafByWidgetId(node.children[0], widgetId);
@@ -88,7 +97,7 @@ export function insertSplitAtLeaf(
   if (!node) return newLeaf;
 
   if (node.kind === "leaf") {
-    if (node.widgetId !== targetWidgetId) return node;
+    if (!node.widgetIds.includes(targetWidgetId)) return node;
     const children: [DockNode, DockNode] = position === "start" ? [newLeaf, node] : [node, newLeaf];
     return {
       id: crypto.randomUUID(),
@@ -154,6 +163,42 @@ export function moveLeafToSplit(
   return next;
 }
 
+export function insertAsTabAtLeaf(
+  root: DockNode | null,
+  targetWidgetId: string,
+  movingId: string,
+): DockNode | null {
+  if (!root) return null;
+
+  if (root.kind === "leaf") {
+    if (!root.widgetIds.includes(targetWidgetId)) return root;
+    const deduped = root.widgetIds.filter((id) => id !== movingId);
+    return {
+      ...root,
+      widgetIds: [...deduped, movingId],
+      activeWidgetId: movingId,
+    };
+  }
+
+  const nextLeft = insertAsTabAtLeaf(root.children[0], targetWidgetId, movingId);
+  if (nextLeft !== root.children[0]) {
+    return {
+      ...root,
+      children: [nextLeft as DockNode, root.children[1]],
+    };
+  }
+
+  const nextRight = insertAsTabAtLeaf(root.children[1], targetWidgetId, movingId);
+  if (nextRight !== root.children[1]) {
+    return {
+      ...root,
+      children: [root.children[0], nextRight as DockNode],
+    };
+  }
+
+  return root;
+}
+
 export function updateSplitRatio(
   node: DockNode | null,
   splitId: string,
@@ -170,6 +215,31 @@ export function updateSplitRatio(
 
   const nextLeft = updateSplitRatio(node.children[0], splitId, nextRatio);
   const nextRight = updateSplitRatio(node.children[1], splitId, nextRatio);
+  if (nextLeft === node.children[0] && nextRight === node.children[1]) return node;
+
+  return {
+    ...node,
+    children: [nextLeft as DockNode, nextRight as DockNode],
+  };
+}
+
+export function updateLeafActive(
+  node: DockNode | null,
+  leafId: string,
+  widgetId: string,
+): DockNode | null {
+  if (!node) return null;
+  if (node.kind === "leaf") {
+    if (node.id !== leafId) return node;
+    if (!node.widgetIds.includes(widgetId)) return node;
+    return {
+      ...node,
+      activeWidgetId: widgetId,
+    };
+  }
+
+  const nextLeft = updateLeafActive(node.children[0], leafId, widgetId);
+  const nextRight = updateLeafActive(node.children[1], leafId, widgetId);
   if (nextLeft === node.children[0] && nextRight === node.children[1]) return node;
 
   return {

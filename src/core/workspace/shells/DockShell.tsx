@@ -25,7 +25,8 @@ type DockShellProps = {
 };
 
 export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: DockShellProps) {
-  const closeWidget = useLayoutStore((state) => state.closeWidget);
+  const closeDockTab = useLayoutStore((state) => state.closeDockTab);
+  const setActiveDockTab = useLayoutStore((state) => state.setActiveDockTab);
   const setDockSplitRatio = useLayoutStore((state) => state.setDockSplitRatio);
 
   const startDockHeaderDrag = (event: ReactPointerEvent<HTMLElement>, widgetId: string) => {
@@ -128,22 +129,48 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
   };
 
   if (node.kind === "leaf") {
-    const widget = widgetsById[node.widgetId];
-    if (!widget) return null;
+    const activeWidget = widgetsById[node.activeWidgetId];
+    if (!activeWidget) return null;
 
-    const module = moduleRegistryById[widget.moduleId];
+    const module = moduleRegistryById[activeWidget.moduleId];
     const ModuleComponent = module.component;
 
     return (
-      <section className="dock-panel" data-dock-widget-id={widget.id}>
+      <section className="dock-panel" data-dock-widget-id={activeWidget.id}>
         <header
           className="dock-header"
-          onPointerDown={(event) => startDockHeaderDrag(event, widget.id)}
+          onPointerDown={(event) => startDockHeaderDrag(event, activeWidget.id)}
         >
-          <span>{module.title}</span>
-          <button type="button" data-no-drag="true" onClick={() => closeWidget(widget.id)}>
-            Fechar
-          </button>
+          <div className="dock-tabs" data-no-drag="true">
+            {node.widgetIds
+              .map((widgetId) => widgetsById[widgetId])
+              .filter((widget): widget is WidgetLayout => Boolean(widget))
+              .map((widget) => {
+                const tabModule = moduleRegistryById[widget.moduleId];
+                const isActive = widget.id === node.activeWidgetId;
+                return (
+                  <button
+                    key={widget.id}
+                    type="button"
+                    className={`dock-tab ${isActive ? "active" : ""}`}
+                    data-no-drag="true"
+                    onClick={() => setActiveDockTab(node.id, widget.id)}
+                  >
+                    <span>{tabModule.title}</span>
+                    <span
+                      className="dock-tab-close"
+                      data-no-drag="true"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        closeDockTab(node.id, widget.id);
+                      }}
+                    >
+                      x
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
         </header>
         <div className="dock-content">
           <ModuleComponent />

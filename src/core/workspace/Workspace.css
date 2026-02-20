@@ -39,6 +39,40 @@
   user-select: none;
 }
 
+.dock-tabs {
+  display: flex;
+  gap: 6px;
+  overflow: auto;
+  min-width: 0;
+}
+
+.dock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-module);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dock-tab.active {
+  background: var(--bg-surface);
+}
+
+.dock-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .dock-header button {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -308,4 +342,11 @@
   right: 0;
   bottom: 0;
   height: 25%;
+}
+
+.panel-zone-center {
+  left: 25%;
+  right: 25%;
+  top: 25%;
+  bottom: 25%;
 }

@@ -22,18 +22,24 @@ type SnapState =
   | { widgetId: string; kind: "workspace-edge"; edge: DockEdge }
   | {
       widgetId: string;
-      kind: "panel";
+      kind: "panel-split";
       targetWidgetId: string;
       side: DockEdge;
+      rect: PanelOverlayRect;
+    }
+  | {
+      widgetId: string;
+      kind: "panel-tab";
+      targetWidgetId: string;
       rect: PanelOverlayRect;
     }
   | null;
 
 type DockDragSnap = {
-  kind: "panel";
+  kind: "panel-split" | "panel-tab";
   movingId: string;
   targetId: string;
-  side: DockEdge;
+  side?: DockEdge;
   rect: PanelOverlayRect;
 } | null;
 
@@ -43,6 +49,7 @@ export function Workspace() {
   const addWidget = useLayoutStore((state) => state.addWidget);
   const dockWidget = useLayoutStore((state) => state.dockWidget);
   const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
+  const dockAsTab = useLayoutStore((state) => state.dockAsTab);
   const moveDockedWidget = useLayoutStore((state) => state.moveDockedWidget);
   const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
@@ -116,6 +123,28 @@ export function Workspace() {
     return null;
   };
 
+  const getPanelDropIntent = (
+    panelEl: HTMLElement,
+    pointerX: number,
+    pointerY: number,
+  ):
+    | { kind: "panel-split"; side: DockEdge; rect: PanelOverlayRect }
+    | { kind: "panel-tab"; rect: PanelOverlayRect }
+    | null => {
+    const rect = panelEl.getBoundingClientRect();
+    const side = getSideWithinPanel(panelEl, pointerX, pointerY);
+    const panelRect = {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    if (side) {
+      return { kind: "panel-split", side, rect: panelRect };
+    }
+    return { kind: "panel-tab", rect: panelRect };
+  };
+
   const isOutsideDockRootWithMargin = (pointerX: number, pointerY: number) => {
     const dockRoot = document.querySelector(".dock-root");
     if (!(dockRoot instanceof HTMLElement)) return true;
@@ -140,21 +169,23 @@ export function Workspace() {
     const panelEl = getDockPanelAtPoint(pointerX, pointerY);
     if (panelEl) {
       const targetWidgetId = panelEl.dataset.dockWidgetId;
-      const side = getSideWithinPanel(panelEl, pointerX, pointerY);
-      if (targetWidgetId && side) {
-        const rect = panelEl.getBoundingClientRect();
-        nextSnap = {
-          widgetId,
-          kind: "panel",
-          targetWidgetId,
-          side,
-          rect: {
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-          },
-        };
+      const intent = getPanelDropIntent(panelEl, pointerX, pointerY);
+      if (targetWidgetId && intent) {
+        nextSnap =
+          intent.kind === "panel-split"
+            ? {
+                widgetId,
+                kind: "panel-split",
+                targetWidgetId,
+                side: intent.side,
+                rect: intent.rect,
+              }
+            : {
+                widgetId,
+                kind: "panel-tab",
+                targetWidgetId,
+                rect: intent.rect,
+              };
       }
     }
 
@@ -181,8 +212,10 @@ export function Workspace() {
 
     const snap = snapRef.current;
     if (snap && snap.widgetId === widgetId) {
-      if (snap.kind === "panel") {
+      if (snap.kind === "panel-split") {
         dockIntoLeaf(widgetId, snap.targetWidgetId, snap.side);
+      } else if (snap.kind === "panel-tab") {
+        dockAsTab(widgetId, snap.targetWidgetId);
       } else {
         dockWidget(widgetId, snap.edge);
       }
@@ -202,21 +235,23 @@ export function Workspace() {
     const panelEl = getDockPanelAtPoint(pointerX, pointerY);
     if (panelEl) {
       const targetId = panelEl.dataset.dockWidgetId;
-      const side = getSideWithinPanel(panelEl, pointerX, pointerY);
-      if (targetId && targetId !== movingId && side) {
-        const rect = panelEl.getBoundingClientRect();
-        next = {
-          kind: "panel",
-          movingId,
-          targetId,
-          side,
-          rect: {
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-          },
-        };
+      const intent = getPanelDropIntent(panelEl, pointerX, pointerY);
+      if (targetId && targetId !== movingId && intent) {
+        next =
+          intent.kind === "panel-split"
+            ? {
+                kind: "panel-split",
+                movingId,
+                targetId,
+                side: intent.side,
+                rect: intent.rect,
+              }
+            : {
+                kind: "panel-tab",
+                movingId,
+                targetId,
+                rect: intent.rect,
+              };
       }
     }
     dockDragRef.current = next;
@@ -237,7 +272,11 @@ export function Workspace() {
 
     const snap = dockDragRef.current;
     if (snap && snap.movingId === movingId) {
-      moveDockedWidget(movingId, snap.targetId, snap.side);
+      if (snap.kind === "panel-split" && snap.side) {
+        moveDockedWidget(movingId, snap.targetId, snap.side);
+      } else if (snap.kind === "panel-tab") {
+        dockAsTab(movingId, snap.targetId);
+      }
     } else if (isOutsideDockRootWithMargin(pointerX, pointerY)) {
       undockWidgetAt(movingId, pointerX - 200, pointerY - 22);
     }
@@ -284,7 +323,7 @@ export function Workspace() {
               />
             </section>
           ) : null}
-          {snapState?.kind === "panel" ? (
+          {snapState?.kind === "panel-split" || snapState?.kind === "panel-tab" ? (
             <section
               className="panel-overlay"
               style={{
@@ -294,21 +333,27 @@ export function Workspace() {
                 height: snapState.rect.height,
               }}
             >
-              <div
-                className={`panel-zone panel-zone-left ${snapState.side === "left" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-right ${snapState.side === "right" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-top ${snapState.side === "top" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-bottom ${snapState.side === "bottom" ? "active" : ""}`}
-              />
+              {snapState.kind === "panel-split" ? (
+                <>
+                  <div
+                    className={`panel-zone panel-zone-left ${snapState.side === "left" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-right ${snapState.side === "right" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-top ${snapState.side === "top" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-bottom ${snapState.side === "bottom" ? "active" : ""}`}
+                  />
+                </>
+              ) : (
+                <div className="panel-zone panel-zone-center active" />
+              )}
             </section>
           ) : null}
-          {dockDragSnap?.kind === "panel" ? (
+          {dockDragSnap?.kind === "panel-split" || dockDragSnap?.kind === "panel-tab" ? (
             <section
               className="panel-overlay"
               style={{
@@ -318,18 +363,24 @@ export function Workspace() {
                 height: dockDragSnap.rect.height,
               }}
             >
-              <div
-                className={`panel-zone panel-zone-left ${dockDragSnap.side === "left" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-right ${dockDragSnap.side === "right" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-top ${dockDragSnap.side === "top" ? "active" : ""}`}
-              />
-              <div
-                className={`panel-zone panel-zone-bottom ${dockDragSnap.side === "bottom" ? "active" : ""}`}
-              />
+              {dockDragSnap.kind === "panel-split" ? (
+                <>
+                  <div
+                    className={`panel-zone panel-zone-left ${dockDragSnap.side === "left" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-right ${dockDragSnap.side === "right" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-top ${dockDragSnap.side === "top" ? "active" : ""}`}
+                  />
+                  <div
+                    className={`panel-zone panel-zone-bottom ${dockDragSnap.side === "bottom" ? "active" : ""}`}
+                  />
+                </>
+              ) : (
+                <div className="panel-zone panel-zone-center active" />
+              )}
             </section>
           ) : null}
         </main>
