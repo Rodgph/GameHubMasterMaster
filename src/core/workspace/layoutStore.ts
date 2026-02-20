@@ -34,6 +34,7 @@ type LayoutState = {
   dockWidget: (id: string, edge: DockEdge) => void;
   dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
   undockWidget: (id: string) => void;
+  undockWidgetAt: (id: string, x: number, y: number) => void;
   resetLayout: () => void;
 };
 
@@ -138,6 +139,23 @@ export const useLayoutStore = create<LayoutState>()(
                   mode: "widget",
                   x: 80,
                   y: 80,
+                  z: getNextZ(state.widgets),
+                }
+              : widget,
+          ),
+          dockTree: {
+            root: removeLeafByWidgetId(state.dockTree.root, id),
+          },
+        })),
+      undockWidgetAt: (id, x, y) =>
+        set((state) => ({
+          widgets: state.widgets.map((widget) =>
+            widget.id === id
+              ? {
+                  ...widget,
+                  mode: "widget",
+                  x: Math.max(0, x),
+                  y: Math.max(0, y),
                   z: getNextZ(state.widgets),
                 }
               : widget,
