@@ -12,5 +12,12 @@ function RequireLoggedUser({ children }: { children: ReactElement }) {
 
 export const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
-  { path: "/", element: <RequireLoggedUser><Workspace /></RequireLoggedUser> },
+  {
+    path: "/",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
 ]);
