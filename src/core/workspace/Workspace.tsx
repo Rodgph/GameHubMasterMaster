@@ -9,6 +9,7 @@ import "./Workspace.css";
 
 const DOCK_SNAP_THRESHOLD = 24;
 const PANEL_SNAP_THRESHOLD = 56;
+const DOCK_UNDOCK_MARGIN = 40;
 
 type PanelOverlayRect = {
   left: number;
@@ -28,16 +29,28 @@ type SnapState =
     }
   | null;
 
+type DockDragSnap = {
+  kind: "panel";
+  movingId: string;
+  targetId: string;
+  side: DockEdge;
+  rect: PanelOverlayRect;
+} | null;
+
 export function Workspace() {
   const widgets = useLayoutStore((state) => state.widgets);
   const dockTree = useLayoutStore((state) => state.dockTree);
   const addWidget = useLayoutStore((state) => state.addWidget);
   const dockWidget = useLayoutStore((state) => state.dockWidget);
   const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
+  const moveDockedWidget = useLayoutStore((state) => state.moveDockedWidget);
+  const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
   const canvasRef = useRef<HTMLElement | null>(null);
   const snapRef = useRef<SnapState>(null);
+  const dockDragRef = useRef<DockDragSnap>(null);
   const [snapState, setSnapState] = useState<SnapState | null>(null);
+  const [dockDragSnap, setDockDragSnap] = useState<DockDragSnap>(null);
 
   const floatingWidgets = useMemo(
     () => widgets.filter((widget) => widget.mode === "widget"),
@@ -101,6 +114,18 @@ export function Workspace() {
     if (pointerY <= rect.top + PANEL_SNAP_THRESHOLD) return "top";
     if (pointerY >= rect.bottom - PANEL_SNAP_THRESHOLD) return "bottom";
     return null;
+  };
+
+  const isOutsideDockRootWithMargin = (pointerX: number, pointerY: number) => {
+    const dockRoot = document.querySelector(".dock-root");
+    if (!(dockRoot instanceof HTMLElement)) return true;
+    const rect = dockRoot.getBoundingClientRect();
+    return (
+      pointerX < rect.left - DOCK_UNDOCK_MARGIN ||
+      pointerX > rect.right + DOCK_UNDOCK_MARGIN ||
+      pointerY < rect.top - DOCK_UNDOCK_MARGIN ||
+      pointerY > rect.bottom + DOCK_UNDOCK_MARGIN
+    );
   };
 
   const handleWidgetDragMove = (
@@ -172,13 +197,67 @@ export function Workspace() {
     setSnapState(null);
   };
 
+  const handleDockDragMove = (movingId: string, pointerX: number, pointerY: number) => {
+    let next: DockDragSnap = null;
+    const panelEl = getDockPanelAtPoint(pointerX, pointerY);
+    if (panelEl) {
+      const targetId = panelEl.dataset.dockWidgetId;
+      const side = getSideWithinPanel(panelEl, pointerX, pointerY);
+      if (targetId && targetId !== movingId && side) {
+        const rect = panelEl.getBoundingClientRect();
+        next = {
+          kind: "panel",
+          movingId,
+          targetId,
+          side,
+          rect: {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          },
+        };
+      }
+    }
+    dockDragRef.current = next;
+    setDockDragSnap(next);
+  };
+
+  const handleDockDragEnd = (
+    movingId: string,
+    pointerX: number,
+    pointerY: number,
+    didDrag: boolean,
+  ) => {
+    if (!didDrag) {
+      dockDragRef.current = null;
+      setDockDragSnap(null);
+      return;
+    }
+
+    const snap = dockDragRef.current;
+    if (snap && snap.movingId === movingId) {
+      moveDockedWidget(movingId, snap.targetId, snap.side);
+    } else if (isOutsideDockRootWithMargin(pointerX, pointerY)) {
+      undockWidgetAt(movingId, pointerX - 200, pointerY - 22);
+    }
+
+    dockDragRef.current = null;
+    setDockDragSnap(null);
+  };
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         <main className="workspace-canvas" ref={canvasRef}>
           {dockTree.root ? (
             <section className="dock-root">
-              <DockShell node={dockTree.root} widgetsById={widgetsById} />
+              <DockShell
+                node={dockTree.root}
+                widgetsById={widgetsById}
+                onDockDragMove={handleDockDragMove}
+                onDockDragEnd={handleDockDragEnd}
+              />
             </section>
           ) : null}
           {floatingWidgets.map((widget) => (
@@ -226,6 +305,30 @@ export function Workspace() {
               />
               <div
                 className={`panel-zone panel-zone-bottom ${snapState.side === "bottom" ? "active" : ""}`}
+              />
+            </section>
+          ) : null}
+          {dockDragSnap?.kind === "panel" ? (
+            <section
+              className="panel-overlay"
+              style={{
+                left: dockDragSnap.rect.left,
+                top: dockDragSnap.rect.top,
+                width: dockDragSnap.rect.width,
+                height: dockDragSnap.rect.height,
+              }}
+            >
+              <div
+                className={`panel-zone panel-zone-left ${dockDragSnap.side === "left" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-right ${dockDragSnap.side === "right" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-top ${dockDragSnap.side === "top" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-bottom ${dockDragSnap.side === "bottom" ? "active" : ""}`}
               />
             </section>
           ) : null}

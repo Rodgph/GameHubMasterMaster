@@ -129,3 +129,27 @@ export function insertSplitAtLeaf(
 
   return node;
 }
+
+export function moveLeafToSplit(
+  root: DockNode | null,
+  movingWidgetId: string,
+  targetWidgetId: string,
+  side: "left" | "right" | "top" | "bottom",
+): DockNode | null {
+  if (movingWidgetId === targetWidgetId) return root;
+
+  const removed = removeLeafByWidgetId(root, movingWidgetId);
+  if (!removed) return createLeaf(movingWidgetId);
+
+  const direction = side === "left" || side === "right" ? "row" : "column";
+  const position = side === "left" || side === "top" ? "start" : "end";
+  const next = insertSplitAtLeaf(
+    removed,
+    targetWidgetId,
+    direction,
+    createLeaf(movingWidgetId),
+    position,
+  );
+  if (next === removed) return removed;
+  return next;
+}

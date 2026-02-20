@@ -5,7 +5,6 @@ import { useLayoutStore } from "../layoutStore";
 import type { WidgetLayout } from "../layoutStore";
 
 const DRAG_THRESHOLD = 8;
-const UNDOCK_MARGIN = 40;
 const INTERACTIVE_SELECTOR = [
   "button",
   "a",
@@ -21,13 +20,14 @@ const INTERACTIVE_SELECTOR = [
 type DockShellProps = {
   node: DockNode;
   widgetsById: Record<string, WidgetLayout>;
+  onDockDragMove: (movingId: string, x: number, y: number) => void;
+  onDockDragEnd: (movingId: string, x: number, y: number, didDrag: boolean) => void;
 };
 
-export function DockShell({ node, widgetsById }: DockShellProps) {
+export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: DockShellProps) {
   const closeWidget = useLayoutStore((state) => state.closeWidget);
-  const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
 
-  const startUndockDrag = (event: ReactPointerEvent<HTMLElement>, widgetId: string) => {
+  const startDockHeaderDrag = (event: ReactPointerEvent<HTMLElement>, widgetId: string) => {
     if (event.button !== 0) return;
     if (!(event.target instanceof HTMLElement)) return;
     if (event.target.closest(INTERACTIVE_SELECTOR)) return;
@@ -38,8 +38,6 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
     const startX = event.clientX;
     const startY = event.clientY;
     let dragging = false;
-    let completed = false;
-
     const cleanup = () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
@@ -56,32 +54,16 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
         element.setPointerCapture(pointerId);
         moveEvent.preventDefault();
       }
-
-      const dockRoot = document.querySelector(".dock-root");
-      if (!(dockRoot instanceof HTMLElement)) return;
-      const rect = dockRoot.getBoundingClientRect();
-      const outside =
-        moveEvent.clientX < rect.left - UNDOCK_MARGIN ||
-        moveEvent.clientX > rect.right + UNDOCK_MARGIN ||
-        moveEvent.clientY < rect.top - UNDOCK_MARGIN ||
-        moveEvent.clientY > rect.bottom + UNDOCK_MARGIN;
-      if (!outside) return;
-
-      completed = true;
-      undockWidgetAt(widgetId, moveEvent.clientX - 200, moveEvent.clientY - 22);
-      if (element.hasPointerCapture(pointerId)) {
-        element.releasePointerCapture(pointerId);
-      }
-      element.style.cursor = "";
-      cleanup();
+      onDockDragMove(widgetId, moveEvent.clientX, moveEvent.clientY);
     };
 
-    const onPointerUp = () => {
-      if (!completed && dragging && element.hasPointerCapture(pointerId)) {
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (dragging && element.hasPointerCapture(pointerId)) {
         element.releasePointerCapture(pointerId);
       }
       element.style.cursor = "";
       cleanup();
+      onDockDragEnd(widgetId, upEvent.clientX, upEvent.clientY, dragging);
     };
 
     window.addEventListener("pointermove", onPointerMove);
@@ -100,7 +82,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
       <section className="dock-panel" data-dock-widget-id={widget.id}>
         <header
           className="dock-header"
-          onPointerDown={(event) => startUndockDrag(event, widget.id)}
+          onPointerDown={(event) => startDockHeaderDrag(event, widget.id)}
         >
           <span>{module.title}</span>
           <button type="button" data-no-drag="true" onClick={() => closeWidget(widget.id)}>
@@ -117,10 +99,20 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
   return (
     <section className={`dock-split dock-${node.direction}`}>
       <div style={{ flexGrow: node.ratio }}>
-        <DockShell node={node.children[0]} widgetsById={widgetsById} />
+        <DockShell
+          node={node.children[0]}
+          widgetsById={widgetsById}
+          onDockDragMove={onDockDragMove}
+          onDockDragEnd={onDockDragEnd}
+        />
       </div>
       <div style={{ flexGrow: 1 - node.ratio }}>
-        <DockShell node={node.children[1]} widgetsById={widgetsById} />
+        <DockShell
+          node={node.children[1]}
+          widgetsById={widgetsById}
+          onDockDragMove={onDockDragMove}
+          onDockDragEnd={onDockDragEnd}
+        />
       </div>
     </section>
   );

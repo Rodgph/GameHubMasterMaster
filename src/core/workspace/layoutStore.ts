@@ -5,6 +5,7 @@ import {
   createEmptyDockTree,
   createLeaf,
   insertSplitAtLeaf,
+  moveLeafToSplit,
   removeLeafByWidgetId,
   splitRoot,
 } from "./dockTree";
@@ -33,6 +34,7 @@ type LayoutState = {
   bringToFront: (id: string) => void;
   dockWidget: (id: string, edge: DockEdge) => void;
   dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
+  moveDockedWidget: (movingId: string, targetId: string, side: DockEdge) => void;
   undockWidget: (id: string) => void;
   undockWidgetAt: (id: string, x: number, y: number) => void;
   resetLayout: () => void;
@@ -130,6 +132,12 @@ export const useLayoutStore = create<LayoutState>()(
             },
           };
         }),
+      moveDockedWidget: (movingId, targetId, side) =>
+        set((state) => ({
+          dockTree: {
+            root: moveLeafToSplit(state.dockTree.root, movingId, targetId, side),
+          },
+        })),
       undockWidget: (id) =>
         set((state) => ({
           widgets: state.widgets.map((widget) =>
