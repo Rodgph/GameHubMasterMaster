@@ -31,6 +31,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
     if (event.button !== 0) return;
     if (!(event.target instanceof HTMLElement)) return;
     if (event.target.closest(INTERACTIVE_SELECTOR)) return;
+    event.preventDefault();
 
     const element = event.currentTarget;
     const pointerId = event.pointerId;
@@ -51,6 +52,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
       if (!dragging) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         dragging = true;
+        element.style.cursor = "grabbing";
         element.setPointerCapture(pointerId);
         moveEvent.preventDefault();
       }
@@ -70,6 +72,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
       if (element.hasPointerCapture(pointerId)) {
         element.releasePointerCapture(pointerId);
       }
+      element.style.cursor = "";
       cleanup();
     };
 
@@ -77,6 +80,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
       if (!completed && dragging && element.hasPointerCapture(pointerId)) {
         element.releasePointerCapture(pointerId);
       }
+      element.style.cursor = "";
       cleanup();
     };
 

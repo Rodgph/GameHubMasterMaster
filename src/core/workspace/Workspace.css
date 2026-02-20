@@ -32,6 +32,11 @@
   padding: 0 12px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
+  user-select: none;
+}
+
+.dock-header span {
+  user-select: none;
 }
 
 .dock-header button {
