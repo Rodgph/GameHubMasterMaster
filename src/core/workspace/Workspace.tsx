@@ -36,6 +36,7 @@ export function Workspace() {
   const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
   const canvasRef = useRef<HTMLElement | null>(null);
+  const snapRef = useRef<SnapState>(null);
   const [snapState, setSnapState] = useState<SnapState | null>(null);
 
   const floatingWidgets = useMemo(
@@ -109,13 +110,15 @@ export function Workspace() {
     pointerX: number,
     pointerY: number,
   ) => {
+    let nextSnap: SnapState = null;
+
     const panelEl = getDockPanelAtPoint(pointerX, pointerY);
     if (panelEl) {
       const targetWidgetId = panelEl.dataset.dockWidgetId;
       const side = getSideWithinPanel(panelEl, pointerX, pointerY);
       if (targetWidgetId && side) {
         const rect = panelEl.getBoundingClientRect();
-        setSnapState({
+        nextSnap = {
           widgetId,
           kind: "panel",
           targetWidgetId,
@@ -126,33 +129,46 @@ export function Workspace() {
             width: rect.width,
             height: rect.height,
           },
-        });
-        return;
+        };
       }
     }
 
-    const edge = getEdgeFromPointer(pointerX, pointerY);
-    setSnapState(edge ? { widgetId, kind: "workspace-edge", edge } : null);
+    if (!nextSnap) {
+      const edge = getEdgeFromPointer(pointerX, pointerY);
+      nextSnap = edge ? { widgetId, kind: "workspace-edge", edge } : null;
+    }
+
+    snapRef.current = nextSnap;
+    setSnapState(nextSnap);
   };
 
   const handleWidgetDragEnd = (
     widgetId: string,
-    _pointerX: number,
-    _pointerY: number,
+    pointerX: number,
+    pointerY: number,
     didDrag: boolean,
   ) => {
     if (!didDrag) {
+      snapRef.current = null;
       setSnapState(null);
       return;
     }
 
-    if (snapState && snapState.widgetId === widgetId) {
-      if (snapState.kind === "panel") {
-        dockIntoLeaf(widgetId, snapState.targetWidgetId, snapState.side);
+    const snap = snapRef.current;
+    if (snap && snap.widgetId === widgetId) {
+      if (snap.kind === "panel") {
+        dockIntoLeaf(widgetId, snap.targetWidgetId, snap.side);
       } else {
-        dockWidget(widgetId, snapState.edge);
+        dockWidget(widgetId, snap.edge);
+      }
+    } else {
+      const edge = getEdgeFromPointer(pointerX, pointerY);
+      if (edge) {
+        dockWidget(widgetId, edge);
       }
     }
+
+    snapRef.current = null;
     setSnapState(null);
   };
 
