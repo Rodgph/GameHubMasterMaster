@@ -1,3 +1,5 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
+
 const DRAG_THRESHOLD = 8;
 
 const INTERACTIVE_SELECTOR = [
@@ -69,4 +71,3 @@ export function createThresholdDragSession(
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerUp);
 }
-import type { PointerEvent as ReactPointerEvent } from "react";
