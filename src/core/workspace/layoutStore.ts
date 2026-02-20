@@ -8,6 +8,7 @@ import {
   moveLeafToSplit,
   removeLeafByWidgetId,
   splitRoot,
+  updateSplitRatio,
 } from "./dockTree";
 import type { DockTree } from "./dockTree";
 import { moduleRegistryById } from "../modules/registry";
@@ -35,6 +36,7 @@ type LayoutState = {
   dockWidget: (id: string, edge: DockEdge) => void;
   dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
   moveDockedWidget: (movingId: string, targetId: string, side: DockEdge) => void;
+  setDockSplitRatio: (splitId: string, ratio: number) => void;
   undockWidget: (id: string) => void;
   undockWidgetAt: (id: string, x: number, y: number) => void;
   resetLayout: () => void;
@@ -136,6 +138,12 @@ export const useLayoutStore = create<LayoutState>()(
         set((state) => ({
           dockTree: {
             root: moveLeafToSplit(state.dockTree.root, movingId, targetId, side),
+          },
+        })),
+      setDockSplitRatio: (splitId, ratio) =>
+        set((state) => ({
+          dockTree: {
+            root: updateSplitRatio(state.dockTree.root, splitId, ratio),
           },
         })),
       undockWidget: (id) =>

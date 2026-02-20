@@ -26,6 +26,7 @@ type DockShellProps = {
 
 export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: DockShellProps) {
   const closeWidget = useLayoutStore((state) => state.closeWidget);
+  const setDockSplitRatio = useLayoutStore((state) => state.setDockSplitRatio);
 
   const startDockHeaderDrag = (event: ReactPointerEvent<HTMLElement>, widgetId: string) => {
     if (event.button !== 0) return;
@@ -71,6 +72,61 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
     window.addEventListener("pointercancel", onPointerUp);
   };
 
+  const startResizeSplit = (
+    event: ReactPointerEvent<HTMLElement>,
+    splitId: string,
+    direction: "row" | "column",
+  ) => {
+    if (event.button !== 0) return;
+
+    const divider = event.currentTarget;
+    const splitEl = divider.closest(".dock-split");
+    if (!(splitEl instanceof HTMLElement)) return;
+
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let dragging = false;
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      if (!dragging) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        dragging = true;
+        divider.setPointerCapture(pointerId);
+        moveEvent.preventDefault();
+      }
+
+      const rect = splitEl.getBoundingClientRect();
+      if (direction === "row" && rect.width > 0) {
+        const ratio = (moveEvent.clientX - rect.left) / rect.width;
+        setDockSplitRatio(splitId, Math.max(0.15, Math.min(0.85, ratio)));
+      }
+      if (direction === "column" && rect.height > 0) {
+        const ratio = (moveEvent.clientY - rect.top) / rect.height;
+        setDockSplitRatio(splitId, Math.max(0.15, Math.min(0.85, ratio)));
+      }
+    };
+
+    const onPointerUp = () => {
+      if (dragging && divider.hasPointerCapture(pointerId)) {
+        divider.releasePointerCapture(pointerId);
+      }
+      cleanup();
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+  };
+
   if (node.kind === "leaf") {
     const widget = widgetsById[node.widgetId];
     if (!widget) return null;
@@ -98,7 +154,7 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
 
   return (
     <section className={`dock-split dock-${node.direction}`}>
-      <div style={{ flexGrow: node.ratio }}>
+      <div className="dock-split-child" style={{ flexGrow: node.ratio }}>
         <DockShell
           node={node.children[0]}
           widgetsById={widgetsById}
@@ -106,7 +162,12 @@ export function DockShell({ node, widgetsById, onDockDragMove, onDockDragEnd }: 
           onDockDragEnd={onDockDragEnd}
         />
       </div>
-      <div style={{ flexGrow: 1 - node.ratio }}>
+      <div
+        className={`dock-divider dock-divider-${node.direction}`}
+        data-no-drag="true"
+        onPointerDown={(event) => startResizeSplit(event, node.id, node.direction)}
+      />
+      <div className="dock-split-child" style={{ flexGrow: 1 - node.ratio }}>
         <DockShell
           node={node.children[1]}
           widgetsById={widgetsById}

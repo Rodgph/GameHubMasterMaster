@@ -153,3 +153,27 @@ export function moveLeafToSplit(
   if (next === removed) return removed;
   return next;
 }
+
+export function updateSplitRatio(
+  node: DockNode | null,
+  splitId: string,
+  nextRatio: number,
+): DockNode | null {
+  if (!node) return null;
+  if (node.kind === "leaf") return node;
+  if (node.id === splitId) {
+    return {
+      ...node,
+      ratio: nextRatio,
+    };
+  }
+
+  const nextLeft = updateSplitRatio(node.children[0], splitId, nextRatio);
+  const nextRight = updateSplitRatio(node.children[1], splitId, nextRatio);
+  if (nextLeft === node.children[0] && nextRight === node.children[1]) return node;
+
+  return {
+    ...node,
+    children: [nextLeft as DockNode, nextRight as DockNode],
+  };
+}

@@ -60,7 +60,34 @@
   width: 100%;
   height: 100%;
   display: flex;
-  gap: 6px;
+}
+
+.dock-split-child {
+  min-width: 0;
+  min-height: 0;
+}
+
+.dock-divider {
+  position: relative;
+  background: var(--border-subtle);
+  opacity: 0.9;
+  flex: 0 0 auto;
+}
+
+.dock-divider::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+
+.dock-divider-row {
+  width: 8px;
+  cursor: col-resize;
+}
+
+.dock-divider-column {
+  height: 8px;
+  cursor: row-resize;
 }
 
 .dock-row {
