@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { moduleRegistry } from "../modules/registry";
 import type { DockEdge, WidgetLayout } from "./layoutStore";
@@ -8,6 +7,7 @@ import { DockShell } from "./shells/DockShell";
 import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
 import { isTauri } from "../platform/isTauri";
+import { tauriListen } from "../platform/tauriEvents";
 
 const DOCK_SNAP_THRESHOLD = 24;
 const PANEL_SNAP_THRESHOLD = 56;
@@ -93,8 +93,8 @@ export function Workspace() {
     let unlistenAttach: (() => void) | null = null;
     let unlistenClose: (() => void) | null = null;
 
-    void listen<{ widgetId: string }>("mm:attach_widget", async (event) => {
-      const widgetId = event.payload.widgetId;
+    void tauriListen<{ widgetId: string }>("mm:attach_widget", async (payload) => {
+      const widgetId = payload.widgetId;
       await closeWidgetWindow(widgetId);
       if (firstDockedWidgetId && firstDockedWidgetId !== widgetId) {
         dockAsTab(widgetId, firstDockedWidgetId);
@@ -105,8 +105,8 @@ export function Workspace() {
       unlistenAttach = unlisten;
     });
 
-    void listen<{ widgetId: string }>("mm:close_widget", (event) => {
-      closeWidget(event.payload.widgetId);
+    void tauriListen<{ widgetId: string }>("mm:close_widget", (payload) => {
+      closeWidget(payload.widgetId);
     }).then((unlisten) => {
       unlistenClose = unlisten;
     });

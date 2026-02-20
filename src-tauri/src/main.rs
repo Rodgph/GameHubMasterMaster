@@ -37,7 +37,7 @@ fn open_widget_window(
     return Ok(());
   }
 
-  let url = format!("/widget?widgetId={widget_id}&moduleId={module_id}");
+  let url = format!("/#/widget?widgetId={widget_id}&moduleId={module_id}");
   WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
     .decorations(false)
     .transparent(true)
