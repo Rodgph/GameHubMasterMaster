@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import { moduleRegistry } from "../modules/registry";
 import type { DockEdge, WidgetLayout } from "./layoutStore";
@@ -6,6 +7,7 @@ import { useLayoutStore } from "./layoutStore";
 import { DockShell } from "./shells/DockShell";
 import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
+import { isTauri } from "../platform/isTauri";
 
 const DOCK_SNAP_THRESHOLD = 24;
 const PANEL_SNAP_THRESHOLD = 56;
@@ -57,8 +59,11 @@ export function Workspace() {
   const dockWidget = useLayoutStore((state) => state.dockWidget);
   const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
   const dockAsTab = useLayoutStore((state) => state.dockAsTab);
+  const closeWidget = useLayoutStore((state) => state.closeWidget);
+  const closeWidgetWindow = useLayoutStore((state) => state.closeWidgetWindow);
   const reorderDockTab = useLayoutStore((state) => state.reorderDockTab);
   const detachDockTab = useLayoutStore((state) => state.detachDockTab);
+  const detachDockTabToWindow = useLayoutStore((state) => state.detachDockTabToWindow);
   const moveDockedWidget = useLayoutStore((state) => state.moveDockedWidget);
   const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
@@ -70,13 +75,47 @@ export function Workspace() {
   const [dockDragSnap, setDockDragSnap] = useState<DockDragSnap>(null);
 
   const floatingWidgets = useMemo(
-    () => widgets.filter((widget) => widget.mode === "widget"),
+    () => widgets.filter((widget) => widget.mode === "widget" && widget.host !== "tauri"),
     [widgets],
   );
   const widgetsById = useMemo<Record<string, WidgetLayout>>(
     () => Object.fromEntries(widgets.map((widget) => [widget.id, widget])),
     [widgets],
   );
+  const firstDockedWidgetId = useMemo(
+    () => widgets.find((widget) => widget.mode === "dock")?.id,
+    [widgets],
+  );
+
+  useEffect(() => {
+    if (!isTauri) return;
+
+    let unlistenAttach: (() => void) | null = null;
+    let unlistenClose: (() => void) | null = null;
+
+    void listen<{ widgetId: string }>("mm:attach_widget", async (event) => {
+      const widgetId = event.payload.widgetId;
+      await closeWidgetWindow(widgetId);
+      if (firstDockedWidgetId && firstDockedWidgetId !== widgetId) {
+        dockAsTab(widgetId, firstDockedWidgetId);
+      } else {
+        dockWidget(widgetId, "right");
+      }
+    }).then((unlisten) => {
+      unlistenAttach = unlisten;
+    });
+
+    void listen<{ widgetId: string }>("mm:close_widget", (event) => {
+      closeWidget(event.payload.widgetId);
+    }).then((unlisten) => {
+      unlistenClose = unlisten;
+    });
+
+    return () => {
+      unlistenAttach?.();
+      unlistenClose?.();
+    };
+  }, [closeWidget, closeWidgetWindow, dockAsTab, dockWidget, firstDockedWidgetId]);
 
   const getEdgeFromPointer = (pointerX: number, pointerY: number): DockEdge | null => {
     const canvas = canvasRef.current;
@@ -378,8 +417,7 @@ export function Workspace() {
       detachDockTab(leafId, tabId);
       moveDockedWidget(tabId, snap.targetId, snap.side);
     } else if (snap?.kind === "undock" && snap.leafId === leafId && snap.tabId === tabId) {
-      detachDockTab(leafId, tabId);
-      undockWidgetAt(tabId, pointerX - 200, pointerY - 22);
+      void detachDockTabToWindow(leafId, tabId, pointerX - 200, pointerY - 22);
     }
 
     tabDragRef.current = null;

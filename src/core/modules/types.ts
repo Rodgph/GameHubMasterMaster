@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 export type ModuleMode = "dock" | "widget";
 export type ModuleId = "chat" | "feed" | "music";
+export type WidgetHost = "dom" | "tauri";
 
 export type ModuleConstraints = {
   minWidth: number;

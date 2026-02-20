@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(target_os = "windows")]
 fn disable_rounded_corners() {
@@ -25,8 +25,42 @@ fn disable_rounded_corners() {
   }
 }
 
+#[tauri::command]
+fn open_widget_window(
+  app: tauri::AppHandle,
+  label: String,
+  widget_id: String,
+  module_id: String,
+) -> Result<(), String> {
+  if let Some(existing) = app.get_webview_window(&label) {
+    let _ = existing.set_focus();
+    return Ok(());
+  }
+
+  let url = format!("/widget?widgetId={widget_id}&moduleId={module_id}");
+  WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .resizable(true)
+    .min_inner_size(400.0, 600.0)
+    .build()
+    .map_err(|error| error.to_string())?;
+
+  Ok(())
+}
+
+#[tauri::command]
+fn close_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
+  if let Some(window) = app.get_webview_window(&label) {
+    window.close().map_err(|error| error.to_string())?;
+  }
+  Ok(())
+}
+
 fn main() {
   tauri::Builder::default()
+    .invoke_handler(tauri::generate_handler![open_widget_window, close_window])
     .setup(|app| {
       let window = app.get_webview_window("main").expect("main window not found");
 

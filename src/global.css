@@ -49,3 +49,49 @@ body {
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
 }
+
+.widget-window-page {
+  min-height: 100vh;
+  background: transparent;
+  padding: 8px;
+}
+
+.widget-window-card {
+  height: calc(100vh - 16px);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.widget-window-header {
+  height: 44px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+
+.widget-window-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.widget-window-actions button,
+.widget-window-close {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  height: 28px;
+}
+
+.widget-window-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}

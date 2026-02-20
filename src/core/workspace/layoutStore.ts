@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ModuleId, ModuleMode } from "../modules/types";
+import type { ModuleId, ModuleMode, WidgetHost } from "../modules/types";
 import {
   createEmptyDockTree,
   createLeaf,
@@ -17,6 +17,8 @@ import {
 } from "./dockTree";
 import type { DockTree } from "./dockTree";
 import { moduleRegistryById } from "../modules/registry";
+import { isTauri } from "../platform/isTauri";
+import { closeWindow, openWidgetWindow } from "../platform/tauriWindows";
 
 export type DockEdge = "left" | "right" | "top" | "bottom";
 
@@ -24,6 +26,8 @@ export type WidgetLayout = {
   id: string;
   moduleId: ModuleId;
   mode: ModuleMode;
+  host?: WidgetHost;
+  windowLabel?: string;
   x: number;
   y: number;
   w: number;
@@ -50,6 +54,14 @@ type LayoutState = {
   setDockSplitRatio: (splitId: string, ratio: number) => void;
   undockWidget: (id: string) => void;
   undockWidgetAt: (id: string, x: number, y: number) => void;
+  spawnWidgetWindow: (widgetId: string) => Promise<void>;
+  closeWidgetWindow: (widgetId: string) => Promise<void>;
+  detachDockTabToWindow: (
+    originLeafId: string,
+    tabId: string,
+    x: number,
+    y: number,
+  ) => Promise<void>;
   resetLayout: () => void;
 };
 
@@ -68,7 +80,7 @@ function clampWidget(widget: WidgetLayout): WidgetLayout {
 
 export const useLayoutStore = create<LayoutState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       widgets: [],
       dockTree: createEmptyDockTree(),
       addWidget: (moduleId) =>
@@ -80,6 +92,7 @@ export const useLayoutStore = create<LayoutState>()(
             id: crypto.randomUUID(),
             moduleId,
             mode: "widget",
+            host: "dom",
             x: baseX,
             y: baseY,
             w: Math.max(520, constraints.minWidth),
@@ -216,6 +229,8 @@ export const useLayoutStore = create<LayoutState>()(
               ? {
                   ...widget,
                   mode: "widget",
+                  host: "dom",
+                  windowLabel: undefined,
                   x: 80,
                   y: 80,
                   z: getNextZ(state.widgets),
@@ -233,6 +248,8 @@ export const useLayoutStore = create<LayoutState>()(
               ? {
                   ...widget,
                   mode: "widget",
+                  host: "dom",
+                  windowLabel: undefined,
                   x: Math.max(0, x),
                   y: Math.max(0, y),
                   z: getNextZ(state.widgets),
@@ -243,18 +260,85 @@ export const useLayoutStore = create<LayoutState>()(
             root: removeLeafByWidgetId(state.dockTree.root, id),
           },
         })),
-      resetLayout: () => set({ widgets: [], dockTree: createEmptyDockTree() }),
-      closeWidget: (id) =>
+      spawnWidgetWindow: async (widgetId) => {
+        const widget = get().widgets.find((entry) => entry.id === widgetId);
+        if (!widget || !isTauri) return;
+        const windowLabel = `w_${widgetId}`;
+
         set((state) => ({
-          widgets: state.widgets.filter((widget) => widget.id !== id),
+          widgets: state.widgets.map((entry) =>
+            entry.id === widgetId
+              ? {
+                  ...entry,
+                  mode: "widget",
+                  host: "tauri",
+                  windowLabel,
+                }
+              : entry,
+          ),
+        }));
+
+        await openWidgetWindow(windowLabel, widgetId, widget.moduleId);
+      },
+      closeWidgetWindow: async (widgetId) => {
+        const widget = get().widgets.find((entry) => entry.id === widgetId);
+        if (!widget) return;
+
+        if (widget.windowLabel && isTauri) {
+          await closeWindow(widget.windowLabel);
+        }
+
+        set((state) => ({
+          widgets: state.widgets.map((entry) =>
+            entry.id === widgetId
+              ? {
+                  ...entry,
+                  host: "dom",
+                  windowLabel: undefined,
+                }
+              : entry,
+          ),
+        }));
+      },
+      detachDockTabToWindow: async (originLeafId, tabId, x, y) => {
+        get().detachDockTab(originLeafId, tabId);
+        if (isTauri) {
+          await get().spawnWidgetWindow(tabId);
+          return;
+        }
+        get().undockWidgetAt(tabId, x, y);
+      },
+      resetLayout: () => set({ widgets: [], dockTree: createEmptyDockTree() }),
+      closeWidget: (id) => {
+        const widget = get().widgets.find((entry) => entry.id === id);
+        if (widget?.windowLabel && isTauri) {
+          void closeWindow(widget.windowLabel);
+        }
+
+        set((state) => ({
+          widgets: state.widgets.filter((entry) => entry.id !== id),
           dockTree: {
             root: removeLeafByWidgetId(state.dockTree.root, id),
           },
-        })),
+        }));
+      },
     }),
     {
       name: "master_master_layout_v1",
       partialize: (state) => ({ widgets: state.widgets, dockTree: state.dockTree }),
+      merge: (persistedState, currentState) => {
+        const typed = persistedState as Partial<LayoutState> | undefined;
+        const persistedWidgets = typed?.widgets ?? currentState.widgets;
+        return {
+          ...currentState,
+          ...typed,
+          widgets: persistedWidgets.map((widget) =>
+            !widget.host || (!isTauri && widget.host === "tauri")
+              ? { ...widget, host: "dom", windowLabel: undefined }
+              : widget,
+          ),
+        };
+      },
     },
   ),
 );

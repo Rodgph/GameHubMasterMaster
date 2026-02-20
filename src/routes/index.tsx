@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { Workspace } from "../core/workspace/Workspace";
 import { Login, isLoggedUser } from "./Login";
+import { WidgetWindow } from "./WidgetWindow";
 
 function RequireLoggedUser({ children }: { children: ReactElement }) {
   if (!isLoggedUser()) {
@@ -12,6 +13,7 @@ function RequireLoggedUser({ children }: { children: ReactElement }) {
 
 export const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
+  { path: "/widget", element: <WidgetWindow /> },
   {
     path: "/",
     element: (
