@@ -8,17 +8,32 @@ import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
 
 const DOCK_SNAP_THRESHOLD = 24;
+const PANEL_SNAP_THRESHOLD = 56;
 
-type SnapState = {
-  widgetId: string;
-  edge: DockEdge | null;
+type PanelOverlayRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 };
+
+type SnapState =
+  | { widgetId: string; kind: "workspace-edge"; edge: DockEdge }
+  | {
+      widgetId: string;
+      kind: "panel";
+      targetWidgetId: string;
+      side: DockEdge;
+      rect: PanelOverlayRect;
+    }
+  | null;
 
 export function Workspace() {
   const widgets = useLayoutStore((state) => state.widgets);
   const dockTree = useLayoutStore((state) => state.dockTree);
   const addWidget = useLayoutStore((state) => state.addWidget);
   const dockWidget = useLayoutStore((state) => state.dockWidget);
+  const dockIntoLeaf = useLayoutStore((state) => state.dockIntoLeaf);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
   const canvasRef = useRef<HTMLElement | null>(null);
   const [snapState, setSnapState] = useState<SnapState | null>(null);
@@ -52,6 +67,41 @@ export function Workspace() {
     return null;
   };
 
+  const getDockPanelAtPoint = (pointerX: number, pointerY: number): HTMLElement | null => {
+    const topEl = document.elementFromPoint(pointerX, pointerY) as HTMLElement | null;
+    const immediatePanel = topEl?.closest("[data-dock-widget-id]") as HTMLElement | null;
+    if (immediatePanel) return immediatePanel;
+
+    const stack = document.elementsFromPoint(pointerX, pointerY);
+    for (const element of stack) {
+      if (!(element instanceof HTMLElement)) continue;
+      const panel = element.closest("[data-dock-widget-id]") as HTMLElement | null;
+      if (panel) return panel;
+    }
+    return null;
+  };
+
+  const getSideWithinPanel = (
+    panelEl: HTMLElement,
+    pointerX: number,
+    pointerY: number,
+  ): DockEdge | null => {
+    const rect = panelEl.getBoundingClientRect();
+    if (
+      pointerX < rect.left ||
+      pointerX > rect.right ||
+      pointerY < rect.top ||
+      pointerY > rect.bottom
+    ) {
+      return null;
+    }
+    if (pointerX <= rect.left + PANEL_SNAP_THRESHOLD) return "left";
+    if (pointerX >= rect.right - PANEL_SNAP_THRESHOLD) return "right";
+    if (pointerY <= rect.top + PANEL_SNAP_THRESHOLD) return "top";
+    if (pointerY >= rect.bottom - PANEL_SNAP_THRESHOLD) return "bottom";
+    return null;
+  };
+
   const handleWidgetDragMove = (
     widgetId: string,
     _nextX: number,
@@ -59,23 +109,49 @@ export function Workspace() {
     pointerX: number,
     pointerY: number,
   ) => {
+    const panelEl = getDockPanelAtPoint(pointerX, pointerY);
+    if (panelEl) {
+      const targetWidgetId = panelEl.dataset.dockWidgetId;
+      const side = getSideWithinPanel(panelEl, pointerX, pointerY);
+      if (targetWidgetId && side) {
+        const rect = panelEl.getBoundingClientRect();
+        setSnapState({
+          widgetId,
+          kind: "panel",
+          targetWidgetId,
+          side,
+          rect: {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          },
+        });
+        return;
+      }
+    }
+
     const edge = getEdgeFromPointer(pointerX, pointerY);
-    setSnapState({ widgetId, edge });
+    setSnapState(edge ? { widgetId, kind: "workspace-edge", edge } : null);
   };
 
   const handleWidgetDragEnd = (
     widgetId: string,
-    pointerX: number,
-    pointerY: number,
+    _pointerX: number,
+    _pointerY: number,
     didDrag: boolean,
   ) => {
     if (!didDrag) {
       setSnapState(null);
       return;
     }
-    const edge = getEdgeFromPointer(pointerX, pointerY);
-    if (edge) {
-      dockWidget(widgetId, edge);
+
+    if (snapState && snapState.widgetId === widgetId) {
+      if (snapState.kind === "panel") {
+        dockIntoLeaf(widgetId, snapState.targetWidgetId, snapState.side);
+      } else {
+        dockWidget(widgetId, snapState.edge);
+      }
     }
     setSnapState(null);
   };
@@ -97,7 +173,7 @@ export function Workspace() {
               onDragEnd={handleWidgetDragEnd}
             />
           ))}
-          {snapState ? (
+          {snapState?.kind === "workspace-edge" ? (
             <section className="dock-overlay">
               <div
                 className={`dock-zone dock-zone-left ${snapState.edge === "left" ? "active" : ""}`}
@@ -110,6 +186,30 @@ export function Workspace() {
               />
               <div
                 className={`dock-zone dock-zone-bottom ${snapState.edge === "bottom" ? "active" : ""}`}
+              />
+            </section>
+          ) : null}
+          {snapState?.kind === "panel" ? (
+            <section
+              className="panel-overlay"
+              style={{
+                left: snapState.rect.left,
+                top: snapState.rect.top,
+                width: snapState.rect.width,
+                height: snapState.rect.height,
+              }}
+            >
+              <div
+                className={`panel-zone panel-zone-left ${snapState.side === "left" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-right ${snapState.side === "right" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-top ${snapState.side === "top" ? "active" : ""}`}
+              />
+              <div
+                className={`panel-zone panel-zone-bottom ${snapState.side === "bottom" ? "active" : ""}`}
               />
             </section>
           ) : null}

@@ -19,7 +19,7 @@ export function DockShell({ node, widgetsById }: DockShellProps) {
     const ModuleComponent = module.component;
 
     return (
-      <section className="dock-panel">
+      <section className="dock-panel" data-dock-widget-id={widget.id}>
         <header className="dock-header">
           <span>{module.title}</span>
           <button type="button" data-no-drag="true" onClick={() => closeWidget(widget.id)}>

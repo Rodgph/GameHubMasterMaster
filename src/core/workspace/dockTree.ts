@@ -1,5 +1,6 @@
 export type DockNodeId = string;
 export type DockPosition = "start" | "end";
+export type InsertPosition = "start" | "end";
 
 export type DockLeaf = {
   id: DockNodeId;
@@ -75,4 +76,56 @@ export function removeLeafByWidgetId(node: DockNode | null, widgetId: string): D
     ...node,
     children: [left, right],
   };
+}
+
+export function insertSplitAtLeaf(
+  node: DockNode | null,
+  targetWidgetId: string,
+  direction: "row" | "column",
+  newLeaf: DockLeaf,
+  position: InsertPosition,
+): DockNode | null {
+  if (!node) return newLeaf;
+
+  if (node.kind === "leaf") {
+    if (node.widgetId !== targetWidgetId) return node;
+    const children: [DockNode, DockNode] = position === "start" ? [newLeaf, node] : [node, newLeaf];
+    return {
+      id: crypto.randomUUID(),
+      kind: "split",
+      direction,
+      ratio: 0.5,
+      children,
+    };
+  }
+
+  const nextLeft = insertSplitAtLeaf(
+    node.children[0],
+    targetWidgetId,
+    direction,
+    newLeaf,
+    position,
+  );
+  if (nextLeft !== node.children[0]) {
+    return {
+      ...node,
+      children: [nextLeft as DockNode, node.children[1]],
+    };
+  }
+
+  const nextRight = insertSplitAtLeaf(
+    node.children[1],
+    targetWidgetId,
+    direction,
+    newLeaf,
+    position,
+  );
+  if (nextRight !== node.children[1]) {
+    return {
+      ...node,
+      children: [node.children[0], nextRight as DockNode],
+    };
+  }
+
+  return node;
 }

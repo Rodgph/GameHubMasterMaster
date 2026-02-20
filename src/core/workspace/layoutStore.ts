@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ModuleId, ModuleMode } from "../modules/types";
-import { createEmptyDockTree, createLeaf, removeLeafByWidgetId, splitRoot } from "./dockTree";
+import {
+  createEmptyDockTree,
+  createLeaf,
+  insertSplitAtLeaf,
+  removeLeafByWidgetId,
+  splitRoot,
+} from "./dockTree";
 import type { DockTree } from "./dockTree";
 import { moduleRegistryById } from "../modules/registry";
 
@@ -26,6 +32,7 @@ type LayoutState = {
   updateWidget: (id: string, patch: Partial<WidgetLayout>) => void;
   bringToFront: (id: string) => void;
   dockWidget: (id: string, edge: DockEdge) => void;
+  dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
   undockWidget: (id: string) => void;
   resetLayout: () => void;
 };
@@ -95,6 +102,31 @@ export const useLayoutStore = create<LayoutState>()(
               widget.id === id ? { ...widget, mode: "dock" } : widget,
             ),
             dockTree: splitRoot(state.dockTree, direction, leaf, position),
+          };
+        }),
+      dockIntoLeaf: (id, targetLeafWidgetId, side) =>
+        set((state) => {
+          const target = state.widgets.find((widget) => widget.id === id);
+          if (!target) return state;
+          if (target.mode === "dock") return state;
+
+          const leaf = createLeaf(id);
+          const direction = side === "left" || side === "right" ? "row" : "column";
+          const position = side === "left" || side === "top" ? "start" : "end";
+
+          return {
+            widgets: state.widgets.map((widget) =>
+              widget.id === id ? { ...widget, mode: "dock" } : widget,
+            ),
+            dockTree: {
+              root: insertSplitAtLeaf(
+                state.dockTree.root,
+                targetLeafWidgetId,
+                direction,
+                leaf,
+                position,
+              ),
+            },
           };
         }),
       undockWidget: (id) =>

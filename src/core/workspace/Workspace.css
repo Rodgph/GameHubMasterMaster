@@ -232,3 +232,48 @@
   bottom: 0;
   height: 24px;
 }
+
+.panel-overlay {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.panel-zone {
+  position: absolute;
+  border: 1px solid var(--border-subtle);
+  background: rgba(2, 2, 2, 0.22);
+}
+
+.panel-zone.active {
+  background: rgba(2, 2, 2, 0.65);
+}
+
+.panel-zone-left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+}
+
+.panel-zone-right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 25%;
+}
+
+.panel-zone-top {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 25%;
+}
+
+.panel-zone-bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 25%;
+}
