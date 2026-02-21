@@ -15,7 +15,11 @@
 }
 
 .chat-module-layout-body {
+  height: 100%;
   flex: 1;
   min-height: 0;
   background: var(--bg-module);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }

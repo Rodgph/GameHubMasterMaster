@@ -4,6 +4,7 @@
   background: var(--bg-module);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .chat-route-placeholder {
@@ -31,7 +32,7 @@
   flex-direction: column;
 }
 
-.chat-conversation-page {
+.chatConversationRoute {
   flex: 1;
   height: 100%;
   min-height: 0;
@@ -42,17 +43,28 @@
   overflow: hidden;
 }
 
-.chat-conversation-top {
+.chatConversationHeaderWrap {
   flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
+}
+
+.chatConversationTopCard {
   padding: 12px 14px;
 }
 
-.chat-conversation-scroll {
+.chatConversationMessagesScroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 14px;
+}
+
+.chatConversationFooterWrap {
+  flex: 0 0 auto;
+}
+
+.chat-context-divider {
+  height: 1px;
+  background: #020202;
+  margin: 2px 6px;
 }

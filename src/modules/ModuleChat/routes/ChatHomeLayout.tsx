@@ -1,9 +1,19 @@
 import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { FiBell, FiBellOff, FiMail, FiStar, FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useSessionStore } from "../../../core/stores/sessionStore";
 import { ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
 import { useUserSearch, type UserSearchItem } from "../hooks/useUserSearch";
-import { addOpenConversation, getOpenConversations } from "../utils/openConversations";
+import {
+  addOpenConversation,
+  getOpenConversations,
+  markRead,
+  markUnread,
+  removeOpenConversation,
+  toggleMuted,
+  togglePinned,
+} from "../utils/openConversations";
+import { ContextMenuItem, ContextMenuOverlay } from "../../../shared/ui";
 import { ChatHomeRoute } from "./ChatHomeRoute";
 
 export function ChatHomeLayout() {
@@ -13,16 +23,29 @@ export function ChatHomeLayout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [openConversations, setOpenConversations] = useState(getOpenConversations);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [contextX, setContextX] = useState(0);
+  const [contextY, setContextY] = useState(0);
+  const [contextUserId, setContextUserId] = useState<string | null>(null);
   const { users: searchUsers, loading: searchLoading } = useUserSearch(searchQuery);
+  const contextConversation =
+    contextUserId === null
+      ? null
+      : (openConversations.find((conversation) => conversation.userId === contextUserId) ?? null);
 
   const chatItems = useMemo(
     () =>
-      openConversations.map((conversation) => ({
-        userId: conversation.userId,
-        username: conversation.username,
-        avatarUrl: conversation.avatarUrl,
-        lastMessage: "Toque para abrir a conversa",
-      })),
+      [...openConversations]
+        .sort((a, b) => {
+          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+          return b.lastOpenedAt.localeCompare(a.lastOpenedAt);
+        })
+        .map((conversation) => ({
+          userId: conversation.userId,
+          username: conversation.username,
+          avatarUrl: conversation.avatarUrl,
+          lastMessage: conversation.lastMessagePreview || "Toque para abrir a conversa",
+        })),
     [openConversations],
   );
 
@@ -65,6 +88,39 @@ export function ChatHomeLayout() {
     }
   };
 
+  const closeContextMenu = () => {
+    setContextOpen(false);
+    setContextUserId(null);
+  };
+
+  const handleRemoveConversation = () => {
+    if (!contextUserId) return;
+    const next = removeOpenConversation(contextUserId);
+    setOpenConversations(next);
+    closeContextMenu();
+  };
+
+  const handleTogglePinned = () => {
+    if (!contextUserId) return;
+    const next = togglePinned(contextUserId);
+    setOpenConversations(next);
+    closeContextMenu();
+  };
+
+  const handleToggleMuted = () => {
+    if (!contextUserId) return;
+    const next = toggleMuted(contextUserId);
+    setOpenConversations(next);
+    closeContextMenu();
+  };
+
+  const handleMarkUnread = () => {
+    if (!contextUserId) return;
+    const next = markUnread(contextUserId, 1);
+    setOpenConversations(next);
+    closeContextMenu();
+  };
+
   return (
     <div className="chat-home-layout" data-no-drag="true">
       <ModuleHeader
@@ -80,7 +136,15 @@ export function ChatHomeLayout() {
         <ChatHomeRoute
           items={chatItems}
           onOpenUserId={(userId) => {
+            const next = markRead(userId);
+            setOpenConversations(next);
             navigate(`/chat/u/${userId}`);
+          }}
+          onOpenContextMenu={({ x, y, userId }) => {
+            setContextX(x);
+            setContextY(y);
+            setContextUserId(userId);
+            setContextOpen(true);
           }}
         />
       </div>
@@ -101,6 +165,29 @@ export function ChatHomeLayout() {
           navigate("/login", { replace: true });
         }}
       />
+      <ContextMenuOverlay isOpen={contextOpen} x={contextX} y={contextY} onClose={closeContextMenu}>
+        <ContextMenuItem
+          label={contextConversation?.pinned ? "Desafixar conversa" : "Fixar conversa"}
+          icon={<FiStar size={16} />}
+          onClick={handleTogglePinned}
+        />
+        <ContextMenuItem
+          label={contextConversation?.muted ? "Ativar notificacoes" : "Silenciar"}
+          icon={contextConversation?.muted ? <FiBellOff size={16} /> : <FiBell size={16} />}
+          onClick={handleToggleMuted}
+        />
+        <ContextMenuItem
+          label="Marcar como nao lida"
+          icon={<FiMail size={16} />}
+          onClick={handleMarkUnread}
+        />
+        <div className="chat-context-divider" />
+        <ContextMenuItem
+          label="Remover conversa"
+          icon={<FiTrash2 size={16} />}
+          onClick={handleRemoveConversation}
+        />
+      </ContextMenuOverlay>
     </div>
   );
 }

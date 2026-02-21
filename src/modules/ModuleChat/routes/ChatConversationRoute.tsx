@@ -46,21 +46,25 @@ export function ChatConversationRoute() {
   }, [userId]);
 
   return (
-    <section className="chat-conversation-page" data-no-drag="true">
-      <ConversationHeader storyCount={5} activeStoryIndex={0} />
-
-      <div className="chat-conversation-top" data-no-drag="true">
-        <ConversationTopUserCard
-          username={user.username}
-          subtitle={user.subtitle}
-          avatarUrl={user.avatarUrl}
-        />
+    <section className="chatConversationRoute" data-no-drag="true">
+      <div className="chatConversationHeaderWrap" data-no-drag="true">
+        <ConversationHeader storyCount={5} activeStoryIndex={0} />
+        <div className="chatConversationTopCard" data-no-drag="true">
+          <ConversationTopUserCard
+            username={user.username}
+            subtitle={user.subtitle}
+            avatarUrl={user.avatarUrl}
+          />
+        </div>
       </div>
 
-      <div className="chat-conversation-scroll" ref={scrollRef} data-no-drag="true">
+      <div className="chatConversationMessagesScroll" ref={scrollRef} data-no-drag="true">
         <MessageList messages={messages} />
       </div>
-      <ConversationFooter onSend={send} />
+
+      <div className="chatConversationFooterWrap" data-no-drag="true">
+        <ConversationFooter onSend={send} />
+      </div>
     </section>
   );
 }

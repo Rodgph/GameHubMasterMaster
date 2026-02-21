@@ -9,6 +9,7 @@ type ChatListItemProps = {
   avatarUrl?: string;
   onOpenUserId: (userId: string) => void;
   onPeekUserId: (userId: string) => void;
+  onOpenContextMenu?: (payload: { x: number; y: number; userId: string }) => void;
 };
 
 export function ChatListItem({
@@ -18,9 +19,19 @@ export function ChatListItem({
   avatarUrl,
   onOpenUserId,
   onPeekUserId,
+  onOpenContextMenu,
 }: ChatListItemProps) {
   return (
-    <article className="chat-list-item" onClick={() => onOpenUserId(userId)} data-no-drag="true">
+    <article
+      className="chat-list-item"
+      onClick={() => onOpenUserId(userId)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenContextMenu?.({ x: event.clientX, y: event.clientY, userId });
+      }}
+      data-no-drag="true"
+    >
       <AvatarCircle src={avatarUrl} alt={username} size={60} />
       <TextBlock title={username} subtitle={lastMessage} />
       <ChatPeekButton userId={userId} onPeek={onPeekUserId} />
