@@ -3,6 +3,7 @@ import { moduleRegistryById } from "../../modules/registry";
 import type { DockNode } from "../dockTree";
 import { useLayoutStore } from "../layoutStore";
 import type { WidgetLayout } from "../layoutStore";
+import { WidgetRuntimeProvider } from "../moduleRuntime";
 
 const DRAG_THRESHOLD = 8;
 const INTERACTIVE_SELECTOR = [
@@ -284,7 +285,9 @@ export function DockShell({
           </div>
         </header>
         <div className="dock-content">
-          <ModuleComponent />
+          <WidgetRuntimeProvider widgetId={activeWidget.id}>
+            <ModuleComponent />
+          </WidgetRuntimeProvider>
         </div>
       </section>
     );

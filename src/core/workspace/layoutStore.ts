@@ -29,6 +29,7 @@ export type WidgetLayout = {
   mode: ModuleMode;
   host?: WidgetHost;
   windowLabel?: string;
+  pinned?: boolean;
   x: number;
   y: number;
   w: number;
@@ -39,9 +40,17 @@ export type WidgetLayout = {
 type LayoutState = {
   widgets: WidgetLayout[];
   dockTree: DockTree;
+  moduleRuntimeStateByWidgetId: Record<string, unknown>;
+  governor: {
+    mainBackground: boolean;
+    windowsBackgroundByWidgetId: Record<string, boolean>;
+  };
   addWidget: (moduleId: ModuleId) => void;
+  addShortcutFromDrop: (file: { name: string; path?: string }) => void;
   closeWidget: (id: string) => void;
   updateWidget: (id: string, patch: Partial<WidgetLayout>) => void;
+  duplicateWidget: (id: string) => void;
+  togglePinWidget: (id: string) => void;
   bringToFront: (id: string) => void;
   dockWidget: (id: string, edge: DockEdge) => void;
   dockIntoLeaf: (id: string, targetLeafWidgetId: string, side: DockEdge) => void;
@@ -53,6 +62,10 @@ type LayoutState = {
   attachDockTabToLeaf: (leafId: string, widgetId: string, index?: number) => void;
   moveDockedWidget: (movingId: string, targetId: string, side: DockEdge) => void;
   setDockSplitRatio: (splitId: string, ratio: number) => void;
+  reattachWidgetToDock: (id: string) => Promise<void>;
+  setWidgetRuntimeState: (id: string, state: unknown) => void;
+  setMainBackgroundMode: (isBackground: boolean) => void;
+  setWindowBackgroundMode: (id: string, isBackground: boolean) => void;
   undockWidget: (id: string) => void;
   undockWidgetAt: (id: string, x: number, y: number) => void;
   spawnWidgetWindow: (widgetId: string) => Promise<void>;
@@ -85,6 +98,11 @@ export const useLayoutStore = create<LayoutState>()(
     (set, get) => ({
       widgets: [],
       dockTree: createEmptyDockTree(),
+      moduleRuntimeStateByWidgetId: {},
+      governor: {
+        mainBackground: false,
+        windowsBackgroundByWidgetId: {},
+      },
       addWidget: (moduleId) =>
         set((state) => {
           const constraints = moduleRegistryById[moduleId].widgetConstraints;
@@ -103,10 +121,69 @@ export const useLayoutStore = create<LayoutState>()(
           };
           return { widgets: [...state.widgets, widget] };
         }),
+      addShortcutFromDrop: (file) =>
+        set((state) => {
+          const baseX = 80 + state.widgets.length * 24;
+          const baseY = 80 + state.widgets.length * 24;
+          const widgetId = crypto.randomUUID();
+          const widget: WidgetLayout = {
+            id: widgetId,
+            moduleId: "shortcut",
+            mode: "widget",
+            host: "dom",
+            x: baseX,
+            y: baseY,
+            w: 520,
+            h: 620,
+            z: getNextZ(state.widgets),
+          };
+
+          return {
+            widgets: [...state.widgets, widget],
+            moduleRuntimeStateByWidgetId: {
+              ...state.moduleRuntimeStateByWidgetId,
+              [widgetId]: {
+                label: file.name,
+                path: file.path ?? file.name,
+              },
+            },
+          };
+        }),
       updateWidget: (id, patch) =>
         set((state) => ({
           widgets: state.widgets.map((widget) =>
             widget.id === id ? clampWidget({ ...widget, ...patch }) : widget,
+          ),
+        })),
+      duplicateWidget: (id) =>
+        set((state) => {
+          const source = state.widgets.find((widget) => widget.id === id);
+          if (!source) return state;
+          const nextId = crypto.randomUUID();
+          const clone: WidgetLayout = {
+            ...source,
+            id: nextId,
+            mode: "widget",
+            host: "dom",
+            windowLabel: undefined,
+            pinned: false,
+            x: source.x + 24,
+            y: source.y + 24,
+            z: getNextZ(state.widgets),
+          };
+
+          return {
+            widgets: [...state.widgets, clone],
+            moduleRuntimeStateByWidgetId: {
+              ...state.moduleRuntimeStateByWidgetId,
+              [nextId]: state.moduleRuntimeStateByWidgetId[id],
+            },
+          };
+        }),
+      togglePinWidget: (id) =>
+        set((state) => ({
+          widgets: state.widgets.map((widget) =>
+            widget.id === id ? { ...widget, pinned: !widget.pinned } : widget,
           ),
         })),
       bringToFront: (id) =>
@@ -130,7 +207,9 @@ export const useLayoutStore = create<LayoutState>()(
 
           return {
             widgets: state.widgets.map((widget) =>
-              widget.id === id ? { ...widget, mode: "dock" } : widget,
+              widget.id === id
+                ? { ...widget, mode: "dock", host: "dom", windowLabel: undefined }
+                : widget,
             ),
             dockTree: splitRoot(state.dockTree, direction, leaf, position),
           };
@@ -147,7 +226,9 @@ export const useLayoutStore = create<LayoutState>()(
 
           return {
             widgets: state.widgets.map((widget) =>
-              widget.id === id ? { ...widget, mode: "dock" } : widget,
+              widget.id === id
+                ? { ...widget, mode: "dock", host: "dom", windowLabel: undefined }
+                : widget,
             ),
             dockTree: {
               root: insertSplitAtLeaf(
@@ -171,7 +252,9 @@ export const useLayoutStore = create<LayoutState>()(
 
           return {
             widgets: state.widgets.map((widget) =>
-              widget.id === movingId ? { ...widget, mode: "dock" } : widget,
+              widget.id === movingId
+                ? { ...widget, mode: "dock", host: "dom", windowLabel: undefined }
+                : widget,
             ),
             dockTree: {
               root: nextRoot,
@@ -206,7 +289,9 @@ export const useLayoutStore = create<LayoutState>()(
       attachDockTabToLeaf: (leafId, widgetId, index) =>
         set((state) => ({
           widgets: state.widgets.map((widget) =>
-            widget.id === widgetId ? { ...widget, mode: "dock" } : widget,
+            widget.id === widgetId
+              ? { ...widget, mode: "dock", host: "dom", windowLabel: undefined }
+              : widget,
           ),
           dockTree: {
             root: insertTabIntoLeafById(state.dockTree.root, leafId, widgetId, index),
@@ -222,6 +307,41 @@ export const useLayoutStore = create<LayoutState>()(
         set((state) => ({
           dockTree: {
             root: updateSplitRatio(state.dockTree.root, splitId, ratio),
+          },
+        })),
+      reattachWidgetToDock: async (id) => {
+        await get().closeWidgetWindow(id);
+        const firstDocked = get().widgets.find(
+          (widget) => widget.mode === "dock" && widget.id !== id,
+        );
+        if (firstDocked) {
+          get().dockAsTab(id, firstDocked.id);
+          return;
+        }
+        get().dockWidget(id, "right");
+      },
+      setWidgetRuntimeState: (id, runtimeState) =>
+        set((state) => ({
+          moduleRuntimeStateByWidgetId: {
+            ...state.moduleRuntimeStateByWidgetId,
+            [id]: runtimeState,
+          },
+        })),
+      setMainBackgroundMode: (isBackground) =>
+        set((state) => ({
+          governor: {
+            ...state.governor,
+            mainBackground: isBackground,
+          },
+        })),
+      setWindowBackgroundMode: (id, isBackground) =>
+        set((state) => ({
+          governor: {
+            ...state.governor,
+            windowsBackgroundByWidgetId: {
+              ...state.governor.windowsBackgroundByWidgetId,
+              [id]: isBackground,
+            },
           },
         })),
       undockWidget: (id) =>
@@ -340,6 +460,11 @@ export const useLayoutStore = create<LayoutState>()(
 
         set((state) => ({
           widgets: state.widgets.filter((entry) => entry.id !== id),
+          moduleRuntimeStateByWidgetId: Object.fromEntries(
+            Object.entries(state.moduleRuntimeStateByWidgetId).filter(
+              ([widgetId]) => widgetId !== id,
+            ),
+          ),
           dockTree: {
             root: removeLeafByWidgetId(state.dockTree.root, id),
           },
@@ -348,13 +473,21 @@ export const useLayoutStore = create<LayoutState>()(
     }),
     {
       name: "master_master_layout_v1",
-      partialize: (state) => ({ widgets: state.widgets, dockTree: state.dockTree }),
+      partialize: (state) => ({
+        widgets: state.widgets,
+        dockTree: state.dockTree,
+        moduleRuntimeStateByWidgetId: state.moduleRuntimeStateByWidgetId,
+      }),
       merge: (persistedState, currentState) => {
         const typed = persistedState as Partial<LayoutState> | undefined;
         const persistedWidgets = typed?.widgets ?? currentState.widgets;
         return {
           ...currentState,
           ...typed,
+          governor: {
+            mainBackground: false,
+            windowsBackgroundByWidgetId: {},
+          },
           widgets: persistedWidgets.map((widget) =>
             !widget.host || (!isTauri && widget.host === "tauri")
               ? { ...widget, host: "dom", windowLabel: undefined }

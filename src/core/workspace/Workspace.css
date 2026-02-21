@@ -153,6 +153,10 @@
   overflow: hidden;
 }
 
+.widget-shell.pinned {
+  border-color: var(--text-secondary);
+}
+
 .widget-header {
   height: 44px;
   display: flex;
@@ -424,6 +428,6 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
-.tab-context-danger {
+.tab-context-secondary {
   color: var(--text-secondary);
 }

@@ -23,6 +23,13 @@ body {
   color: var(--text-primary);
 }
 
+body.app-background *,
+body.app-background *::before,
+body.app-background *::after {
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;

@@ -1,15 +1,21 @@
 import { useEffect, useRef } from "react";
 
-type TabContextMenuProps = {
+export type ContextMenuItem = {
+  id: string;
+  label: string;
+  secondary?: boolean;
+  onSelect: () => void;
+};
+
+type UniversalContextMenuProps = {
   open: boolean;
   x: number;
   y: number;
+  items: ContextMenuItem[];
   onClose: () => void;
-  onPopout: () => void;
-  onCloseTab: () => void;
 };
 
-export function TabContextMenu({ open, x, y, onClose, onPopout, onCloseTab }: TabContextMenuProps) {
+export function UniversalContextMenu({ open, x, y, items, onClose }: UniversalContextMenuProps) {
   const menuRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -34,30 +40,23 @@ export function TabContextMenu({ open, x, y, onClose, onPopout, onCloseTab }: Ta
     };
   }, [onClose, open]);
 
-  if (!open) return null;
+  if (!open || items.length === 0) return null;
 
   return (
     <section ref={menuRef} className="tab-context-menu" style={{ left: x, top: y }}>
-      <button
-        type="button"
-        className="tab-context-item"
-        onClick={() => {
-          onPopout();
-          onClose();
-        }}
-      >
-        <span>Abrir em janela (Popout)</span>
-      </button>
-      <button
-        type="button"
-        className="tab-context-item tab-context-danger"
-        onClick={() => {
-          onCloseTab();
-          onClose();
-        }}
-      >
-        <span>Fechar</span>
-      </button>
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className={`tab-context-item ${item.secondary ? "tab-context-secondary" : ""}`}
+          onClick={() => {
+            item.onSelect();
+            onClose();
+          }}
+        >
+          <span>{item.label}</span>
+        </button>
+      ))}
     </section>
   );
 }
