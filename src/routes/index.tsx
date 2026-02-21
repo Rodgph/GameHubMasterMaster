@@ -40,6 +40,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/chat/conversation/:roomId",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
     path: "/chat/favs",
     element: (
       <RequireLoggedUser>
@@ -81,14 +89,6 @@ export const router = createBrowserRouter([
   },
   {
     path: "/chat/story/:userId",
-    element: (
-      <RequireLoggedUser>
-        <Workspace />
-      </RequireLoggedUser>
-    ),
-  },
-  {
-    path: "/chat/group/create",
     element: (
       <RequireLoggedUser>
         <Workspace />

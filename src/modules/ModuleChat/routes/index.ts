@@ -1,5 +1,4 @@
 export * from "./ChatAccountRoute";
-export * from "./ChatCreateGroupRoute";
 export * from "./ChatCreateServerRoute";
 export * from "./ChatHomeLayout";
 export * from "./ChatHomeRoute";

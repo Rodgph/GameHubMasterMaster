@@ -6,7 +6,6 @@ import { ChatModuleLayout } from "./ChatModuleLayout";
 import {
   ChatAccountRoute,
   ChatConversationRoute,
-  ChatCreateGroupRoute,
   ChatCreateServerRoute,
   ChatHomeLayout,
   ChatProfileRoute,
@@ -80,12 +79,13 @@ export function ChatModule() {
   void handleCreateRoom;
   void handleSend;
 
-  const isConversationRoute = matchPath("/chat/u/:userId", location.pathname) !== null;
+  const isConversationRoute =
+    matchPath("/chat/conversation/:roomId", location.pathname) !== null ||
+    matchPath("/chat/u/:userId", location.pathname) !== null;
   const isFavsRoute = matchPath("/chat/favs", location.pathname) !== null;
   const isAccountRoute = matchPath("/chat/account", location.pathname) !== null;
   const isProfileRoute = matchPath("/chat/profile/:userId", location.pathname) !== null;
   const isStoryRoute = matchPath("/chat/story/:userId", location.pathname) !== null;
-  const isCreateGroupRoute = matchPath("/chat/group/create", location.pathname) !== null;
   const isCreateServerRoute = matchPath("/chat/server/create", location.pathname) !== null;
   const isSettingsRoute = matchPath("/chat/settings", location.pathname) !== null;
   const isChatHomeRoute = matchPath("/chat", location.pathname) !== null;
@@ -109,9 +109,6 @@ export function ChatModule() {
     }
     if (isStoryRoute) {
       return <ChatStoryRoute />;
-    }
-    if (isCreateGroupRoute) {
-      return <ChatCreateGroupRoute />;
     }
     if (isCreateServerRoute) {
       return <ChatCreateServerRoute />;

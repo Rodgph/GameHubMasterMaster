@@ -4,9 +4,11 @@ import { RiUserFollowLine, RiUserUnfollowLine } from "react-icons/ri";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { CreateGroupOverlay, FloatingCreateMenu, ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
+import { getOrCreateDMRoom } from "../data/dm.repository";
 import { followUser, unfollowUser } from "../data/follows.repository";
+import { createGroupRoom } from "../data/groups.repository";
 import { listActiveStoriesByUserIds } from "../data/stories.repository";
-import { FloatingCreateMenu, ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
 import { useFollowedProfiles } from "../hooks/useFollowedProfiles";
 import { useUserSearch, type UserSearchItem } from "../hooks/useUserSearch";
 import {
@@ -29,6 +31,7 @@ export function ChatHomeLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [openConversations, setOpenConversations] = useState(getOpenConversations);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [contextOpen, setContextOpen] = useState(false);
   const [contextX, setContextX] = useState(0);
@@ -73,6 +76,7 @@ export function ChatHomeLayout() {
     contextUserId === null
       ? null
       : (openConversations.find((conversation) => conversation.userId === contextUserId) ?? null);
+  const contextIsGroup = contextConversation?.type === "group";
   const stories = useMemo(
     () => {
       const followedStories = followedProfiles
@@ -117,7 +121,12 @@ export function ChatHomeLayout() {
 
   const isSearchOpen = searchQuery.trim().length > 0;
 
-  const handleSelectUser = (user: UserSearchItem) => {
+  const handleSelectUser = async (user: UserSearchItem) => {
+    if (!currentUserId) return;
+    const dm = await getOrCreateDMRoom({
+      currentUserId,
+      otherUserId: user.id,
+    });
     const conversation = {
       userId: user.id,
       username: user.username,
@@ -129,7 +138,14 @@ export function ChatHomeLayout() {
     setOpenConversations(getOpenConversations());
     setSearchQuery("");
     setActiveSearchIndex(0);
-    navigate(`/chat/u/${user.id}`);
+    navigate(`/chat/conversation/${dm.roomId}`, {
+      state: {
+        type: "dm",
+        peerId: user.id,
+        username: user.username,
+        avatarUrl: user.avatar_url ?? undefined,
+      },
+    });
   };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -230,17 +246,21 @@ export function ChatHomeLayout() {
         icon: contextConversation?.muted ? <FiBellOff size={16} /> : <FiBell size={16} />,
         onClick: handleToggleMuted,
       },
-      {
-        id: "follow",
-        label: contextUserId && followedIds.has(contextUserId) ? "Deixar de seguir" : "Seguir",
-        icon:
-          contextUserId && followedIds.has(contextUserId) ? (
-            <RiUserUnfollowLine size={16} />
-          ) : (
-            <RiUserFollowLine size={16} />
-          ),
-        onClick: handleFollowFromContext,
-      },
+      ...(contextIsGroup
+        ? []
+        : [
+            {
+              id: "follow",
+              label: contextUserId && followedIds.has(contextUserId) ? "Deixar de seguir" : "Seguir",
+              icon:
+                contextUserId && followedIds.has(contextUserId) ? (
+                  <RiUserUnfollowLine size={16} />
+                ) : (
+                  <RiUserFollowLine size={16} />
+                ),
+              onClick: handleFollowFromContext,
+            },
+          ]),
       {
         id: "unread",
         label: "Marcar como nao lida",
@@ -258,6 +278,7 @@ export function ChatHomeLayout() {
     [
       contextConversation?.muted,
       contextConversation?.pinned,
+      contextIsGroup,
       contextUserId,
       followedIds,
       handleFollowFromContext,
@@ -285,9 +306,35 @@ export function ChatHomeLayout() {
         <ChatHomeRoute
           items={chatItems}
           onOpenUserId={(userId) => {
-            const next = markRead(userId);
-            setOpenConversations(next);
-            navigate(`/chat/u/${userId}`);
+            const open = async () => {
+              if (!currentUserId) return;
+              const next = markRead(userId);
+              setOpenConversations(next);
+              const target = openConversations.find((item) => item.userId === userId);
+              if (target?.type === "group" && target.roomId) {
+                navigate(`/chat/conversation/${target.roomId}`, {
+                  state: {
+                    type: "group",
+                    groupName: target.username,
+                    avatarUrl: target.avatarUrl,
+                  },
+                });
+                return;
+              }
+              const dm = await getOrCreateDMRoom({
+                currentUserId,
+                otherUserId: userId,
+              });
+              navigate(`/chat/conversation/${dm.roomId}`, {
+                state: {
+                  type: "dm",
+                  peerId: userId,
+                  username: target?.username ?? "Conversa",
+                  avatarUrl: target?.avatarUrl,
+                },
+              });
+            };
+            void open();
           }}
           onOpenContextMenu={({ x, y, userId }) => {
             // Force-close any other open context menu layers (e.g. workspace Radix menu)
@@ -340,8 +387,51 @@ export function ChatHomeLayout() {
       />
       <FloatingCreateMenu
         onCreateStory={() => navigate("/chat/story/create")}
-        onCreateGroup={() => navigate("/chat/group/create")}
+        onCreateGroup={() => setCreateGroupOpen(true)}
         onCreateServer={() => navigate("/chat/server/create")}
+      />
+      <CreateGroupOverlay
+        open={createGroupOpen}
+        currentUserId={currentUserId}
+        onClose={() => setCreateGroupOpen(false)}
+        onCreateNow={async (payload) => {
+          if (!currentUserId) return;
+          const created = await createGroupRoom({
+            ownerId: currentUserId,
+            name: payload.name,
+            description: payload.description,
+            memberIds: payload.memberIds,
+            imageFile: payload.imageFile,
+          });
+          if (!created.roomId) return;
+          addOpenConversation({
+            userId: `group:${created.roomId}`,
+            type: "group",
+            roomId: created.roomId,
+            username: payload.name,
+            lastOpenedAt: new Date().toISOString(),
+          });
+          setOpenConversations(getOpenConversations());
+          setCreateGroupOpen(false);
+          navigate(`/chat/conversation/${created.roomId}`, {
+            state: {
+              type: "group",
+              groupName: payload.name,
+            },
+          });
+        }}
+        onSchedule={async (payload) => {
+          if (!currentUserId) return;
+          await createGroupRoom({
+            ownerId: currentUserId,
+            name: payload.name,
+            description: payload.description,
+            memberIds: payload.memberIds,
+            imageFile: payload.imageFile,
+            scheduleAt: payload.scheduleAt || new Date().toISOString(),
+          });
+          setCreateGroupOpen(false);
+        }}
       />
     </div>
   );

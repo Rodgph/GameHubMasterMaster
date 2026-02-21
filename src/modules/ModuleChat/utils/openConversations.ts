@@ -1,5 +1,7 @@
 export type OpenConversation = {
   userId: string;
+  type?: "dm" | "group";
+  roomId?: string;
   username: string;
   avatarUrl?: string;
   lastOpenedAt: string;
@@ -14,6 +16,8 @@ const STORAGE_KEY = "chat_open_conversations";
 function normalizeConversation(item: OpenConversation): OpenConversation {
   return {
     ...item,
+    type: item.type === "group" ? "group" : "dm",
+    roomId: typeof item.roomId === "string" ? item.roomId : undefined,
     pinned: Boolean(item.pinned),
     muted: Boolean(item.muted),
     unreadCount: Number.isFinite(item.unreadCount) ? Math.max(0, Number(item.unreadCount)) : 0,

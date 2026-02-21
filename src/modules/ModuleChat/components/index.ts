@@ -1,6 +1,7 @@
 export * from "./ChatList/ChatList";
 export * from "./ChatListItem/ChatListItem";
 export * from "./ChatPeekButton/ChatPeekButton";
+export * from "./CreateGroupOverlay/CreateGroupOverlay";
 export * from "./FloatingCreateMenu/FloatingCreateMenu";
 export * from "./MenuItem/MenuItem";
 export * from "./ModuleHeader/ModuleHeader";
