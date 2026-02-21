@@ -11,9 +11,25 @@ database_id = "9b3889d1-b36c-4dd3-b76e-18dbc15aa1f8"
 name = "REALTIME"
 class_name = "RealtimeDO"
 
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RoomDO"
+
+[[durable_objects.bindings]]
+name = "FEED"
+class_name = "FeedDO"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RealtimeDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RoomDO"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["FeedDO"]
 
 [vars]
 SUPABASE_PROJECT_URL = "https://rvtwvaenkbpyktijbjdf.supabase.co"
