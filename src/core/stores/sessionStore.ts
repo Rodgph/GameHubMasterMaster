@@ -76,7 +76,7 @@ function validateUsername(raw: string) {
 }
 
 function toSyntheticEmail(username: string) {
-  return `${username}@gamehubmastermaster.com`;
+  return `${username}@example.com`;
 }
 
 function baseModulesMap(): Record<ModuleId, boolean> {

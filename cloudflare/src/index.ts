@@ -9,6 +9,15 @@ type Env = {
   SUPABASE_JWT_AUD: string;
 };
 
+function corsHeaders(request: Request) {
+  const origin = request.headers.get("origin") ?? "*";
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
+    "access-control-allow-headers": "authorization,content-type",
+  };
+}
+
 type VerifiedUser = {
   userId: string;
 };
@@ -24,10 +33,13 @@ type ModuleId = (typeof MODULE_IDS)[number];
 
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-function json(data: unknown, status = 200) {
+function json(data: unknown, request: Request, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...corsHeaders(request),
+    },
   });
 }
 
@@ -121,7 +133,7 @@ async function handleBootstrap(request: Request, env: Env, userId: string) {
 
   if (!existing) {
     if (!username) {
-      return json({ error: "username_required" }, 400);
+      return json({ error: "username_required" }, request, 400);
     }
 
     try {
@@ -131,7 +143,7 @@ async function handleBootstrap(request: Request, env: Env, userId: string) {
         .bind(userId, username, displayName ?? username, avatarUrl)
         .run();
     } catch {
-      return json({ error: "username_unavailable" }, 409);
+      return json({ error: "username_unavailable" }, request, 409);
     }
   }
 
@@ -142,26 +154,29 @@ async function handleBootstrap(request: Request, env: Env, userId: string) {
     .first<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>();
 
   if (!user) {
-    return json({ error: "bootstrap_failed" }, 500);
+    return json({ error: "bootstrap_failed" }, request, 500);
   }
 
   const modules = await getModulesEnabled(env, userId);
 
-  return json({
-    user: {
-      id: user.id,
-      username: user.username,
+  return json(
+    {
+      user: {
+        id: user.id,
+        username: user.username,
       display_name: user.display_name,
       avatar_url: user.avatar_url,
     },
     modulesEnabled: modules.modulesEnabled,
-    firstRun: modules.firstRun,
-  });
+      firstRun: modules.firstRun,
+    },
+    request,
+  );
 }
 
-async function handleGetModules(env: Env, userId: string) {
+async function handleGetModules(request: Request, env: Env, userId: string) {
   const modules = await getModulesEnabled(env, userId);
-  return json({ modulesEnabled: modules.modulesEnabled, firstRun: modules.firstRun });
+  return json({ modulesEnabled: modules.modulesEnabled, firstRun: modules.firstRun }, request);
 }
 
 async function broadcastModulesChanged(env: Env, userId: string, modulesEnabled: Record<ModuleId, boolean>) {
@@ -181,7 +196,7 @@ async function handlePutModules(request: Request, env: Env, userId: string) {
     | null;
 
   if (!body?.modulesEnabled || typeof body.modulesEnabled !== "object") {
-    return json({ error: "invalid_payload" }, 400);
+    return json({ error: "invalid_payload" }, request, 400);
   }
 
   const now = new Date().toISOString();
@@ -201,7 +216,7 @@ async function handlePutModules(request: Request, env: Env, userId: string) {
   const modules = await getModulesEnabled(env, userId);
   await broadcastModulesChanged(env, userId, modules.modulesEnabled);
 
-  return json({ modulesEnabled: modules.modulesEnabled, firstRun: false });
+  return json({ modulesEnabled: modules.modulesEnabled, firstRun: false }, request);
 }
 
 async function handleRealtime(request: Request, env: Env, userId: string) {
@@ -220,36 +235,47 @@ async function handleRealtime(request: Request, env: Env, userId: string) {
 
 const worker: ExportedHandler<Env> = {
   async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/health") {
-      return json({ ok: true });
-    }
-
-    let verified: VerifiedUser;
     try {
-      verified = await verifyUser(request, env);
-    } catch {
-      return json({ error: "unauthorized" }, 401);
-    }
+      const url = new URL(request.url);
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: corsHeaders(request),
+        });
+      }
 
-    if (request.method === "POST" && url.pathname === "/bootstrap") {
-      return handleBootstrap(request, env, verified.userId);
-    }
+      if (url.pathname === "/health") {
+        return json({ ok: true }, request);
+      }
 
-    if (request.method === "GET" && url.pathname === "/modules") {
-      return handleGetModules(env, verified.userId);
-    }
+      let verified: VerifiedUser;
+      try {
+        verified = await verifyUser(request, env);
+      } catch {
+        return json({ error: "unauthorized" }, request, 401);
+      }
 
-    if (request.method === "PUT" && url.pathname === "/modules") {
-      return handlePutModules(request, env, verified.userId);
-    }
+      if (request.method === "POST" && url.pathname === "/bootstrap") {
+        return handleBootstrap(request, env, verified.userId);
+      }
 
-    if (request.method === "GET" && url.pathname === "/realtime/ws") {
-      return handleRealtime(request, env, verified.userId);
-    }
+      if (request.method === "GET" && url.pathname === "/modules") {
+        return handleGetModules(request, env, verified.userId);
+      }
 
-    return new Response("Not Found", { status: 404 });
+      if (request.method === "PUT" && url.pathname === "/modules") {
+        return handlePutModules(request, env, verified.userId);
+      }
+
+      if (request.method === "GET" && url.pathname === "/realtime/ws") {
+        return handleRealtime(request, env, verified.userId);
+      }
+
+      return new Response("Not Found", { status: 404, headers: corsHeaders(request) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "internal_error";
+      return json({ error: "internal_error", message }, request, 500);
+    }
   },
 };
 
