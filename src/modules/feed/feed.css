@@ -1,0 +1,254 @@
+.feed-module {
+  gap: 12px;
+}
+
+.feed-status {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.feed-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.feed-composer textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+.feed-composer-preview {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+}
+
+.feed-composer-actions,
+.feed-post-actions,
+.feed-comments-actions,
+.feed-comment-actions,
+.feed-post-header,
+.feed-list-header,
+.feed-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-button,
+.feed-load-more,
+.feed-post-actions button,
+.feed-composer-actions button,
+.feed-comments-actions button,
+.feed-comment-actions button,
+.feed-user-button,
+.feed-modal-header button,
+.feed-edit-row button,
+.feed-reaction-picker button,
+.feed-edited button {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  height: 32px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.feed-button:hover,
+.feed-load-more:hover,
+.feed-post-actions button:hover,
+.feed-composer-actions button:hover,
+.feed-comments-actions button:hover,
+.feed-comment-actions button:hover,
+.feed-user-button:hover,
+.feed-modal-header button:hover,
+.feed-edit-row button:hover,
+.feed-reaction-picker button:hover,
+.feed-edited button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.feed-file-input {
+  display: none;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feed-list-header {
+  justify-content: space-between;
+  color: var(--text-secondary);
+}
+
+.feed-post-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 10px;
+}
+
+.feed-user-button {
+  height: 28px;
+}
+
+.feed-post-meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.feed-post-body {
+  margin: 0;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.feed-post-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+}
+
+.feed-like-button.active {
+  background: rgba(251, 251, 251, 0.12);
+}
+
+.feed-reactions-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.feed-reaction-pill {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+}
+
+.feed-reaction-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  padding: 8px;
+}
+
+.feed-comments {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feed-comment-item {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  padding: 8px;
+}
+
+.feed-comment-item p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.feed-comments-actions input,
+.feed-edit-row textarea {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+.feed-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.feed-edited {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.feed-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.feed-modal {
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-module);
+  color: var(--text-primary);
+  padding: 12px;
+}
+
+.feed-modal-header {
+  justify-content: space-between;
+}
+
+.feed-modal-list,
+.feed-data-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.feed-version-item,
+.feed-data-grid section {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  padding: 8px;
+}
+
+.feed-version-item p,
+.feed-version-item span,
+.feed-data-grid p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.feed-data-grid h4 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.feed-empty {
+  color: var(--text-secondary);
+}
