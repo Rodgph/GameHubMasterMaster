@@ -1,5 +1,5 @@
 import { ChatPeekButton } from "../ChatPeekButton/ChatPeekButton";
-import { AvatarCircle, TextBlock } from "../../../../shared/ui";
+import { AvatarCircle } from "../../../../shared/ui";
 import "./ChatListItem.css";
 
 type ChatListItemProps = {
@@ -33,8 +33,13 @@ export function ChatListItem({
       data-no-drag="true"
     >
       <AvatarCircle src={avatarUrl} alt={username} size={60} />
-      <TextBlock title={username} subtitle={lastMessage} />
-      <ChatPeekButton userId={userId} onPeek={onPeekUserId} />
+      <div className="chat-list-item-content" data-no-drag="true">
+        <div className="chat-list-item-title-row" data-no-drag="true">
+          <span className="chat-list-item-title">{username}</span>
+          <ChatPeekButton userId={userId} onPeek={onPeekUserId} className="chat-peek-inline" />
+        </div>
+        <span className="chat-list-item-subtitle">{lastMessage}</span>
+      </div>
     </article>
   );
 }

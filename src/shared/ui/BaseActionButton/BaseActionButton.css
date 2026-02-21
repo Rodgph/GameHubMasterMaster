@@ -1,0 +1,27 @@
+.base-action-button {
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: #020202;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.base-action-button:hover {
+  background: #0a0a0a;
+}
+
+.base-action-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.base-action-button-label {
+  line-height: 1;
+}

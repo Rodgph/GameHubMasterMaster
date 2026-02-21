@@ -1,0 +1,58 @@
+.context-menu-base-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+}
+
+.context-menu-base-surface {
+  position: fixed;
+  min-width: 180px;
+  padding: 8px;
+  border-radius: 16px;
+  background: #111;
+  z-index: 1301;
+}
+
+.context-menu-base-item {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: #020202;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.context-menu-base-item:hover {
+  background: #0a0a0a;
+}
+
+.context-menu-base-item:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.context-menu-base-item-secondary {
+  color: var(--text-secondary);
+}
+
+.context-menu-base-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-menu-base-item-label {
+  color: inherit;
+  font-size: 14px;
+}
+
+.context-menu-base-divider {
+  height: 1px;
+  background: #020202;
+  margin: 2px 6px;
+}

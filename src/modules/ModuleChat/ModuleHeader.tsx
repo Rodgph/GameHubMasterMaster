@@ -5,19 +5,19 @@ import { BaseIconButton, BasePillInput } from "../../shared/ui";
 import { StoryItem } from "./StoryItem";
 import "./ModuleHeader.css";
 
-const mockStories = [
-  { id: "1", name: "Lana", avatar: "https://i.pravatar.cc/130?img=5" },
-  { id: "2", name: "Pedro", avatar: "https://i.pravatar.cc/130?img=12" },
-  { id: "3", name: "Maya", avatar: "https://i.pravatar.cc/130?img=32" },
-  { id: "4", name: "Rafa", avatar: "https://i.pravatar.cc/130?img=22" },
-  { id: "5", name: "Sofia", avatar: "https://i.pravatar.cc/130?img=47" },
-];
+type HeaderStory = {
+  id: string;
+  name: string;
+  avatar?: string | null;
+};
 
 type ModuleHeaderProps = {
   onSettingsClick?: () => void;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   onSearchKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+  stories?: HeaderStory[];
+  onOpenStory?: (storyId: string) => void;
 };
 
 export function ModuleHeader({
@@ -25,6 +25,8 @@ export function ModuleHeader({
   searchValue = "",
   onSearchChange,
   onSearchKeyDown,
+  stories = [],
+  onOpenStory,
 }: ModuleHeaderProps) {
   return (
     <header className="module-header" data-no-drag="true">
@@ -43,11 +45,18 @@ export function ModuleHeader({
         </BaseIconButton>
       </div>
 
-      <div className="module-header-stories-row" data-no-drag="true">
-        {mockStories.map((story) => (
-          <StoryItem key={story.id} name={story.name} avatar={story.avatar} />
-        ))}
-      </div>
+      {stories.length > 0 ? (
+        <div className="module-header-stories-row" data-no-drag="true">
+          {stories.map((story) => (
+            <StoryItem
+              key={story.id}
+              name={story.name}
+              avatar={story.avatar}
+              onClick={() => onOpenStory?.(story.id)}
+            />
+          ))}
+        </div>
+      ) : null}
     </header>
   );
 }

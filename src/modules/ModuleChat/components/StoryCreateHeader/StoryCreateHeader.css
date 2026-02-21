@@ -1,0 +1,20 @@
+.story-create-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.story-create-header-modes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.story-create-header-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.story-create-header-icon-active {
+  background: #111111;
+}

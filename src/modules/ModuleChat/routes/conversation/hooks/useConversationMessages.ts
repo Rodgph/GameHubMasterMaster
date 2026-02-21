@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getLastSync,
+  getMessagesByConversation,
+  listOutbox,
+  markMessageFailed,
+  putPendingMessage,
+  setLastSync,
+  updateMessageDelivery,
+  upsertMessages,
+} from "../../../../../infra/localdb/chatRepo";
 import { useSessionStore } from "../../../../../core/stores/sessionStore";
 import { makeConversationKey } from "../data/conversationKey";
 import { fetchMessages, sendMessage } from "../data/message.repository";
@@ -20,11 +30,56 @@ function isUuid(value: string | null | undefined) {
 }
 
 function upsertMessage(list: Message[], next: Message): Message[] {
-  const index = list.findIndex((item) => item.id === next.id);
+  const index = list.findIndex(
+    (item) =>
+      (item.clientId && next.clientId && item.clientId === next.clientId) || item.id === next.id,
+  );
   if (index < 0) return [...list, next];
   const copy = [...list];
-  copy[index] = next;
+  copy[index] = { ...copy[index], ...next };
   return copy;
+}
+
+function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  const map = new Map<string, Message>();
+  for (const item of [...current, ...incoming]) {
+    const key = item.clientId ? `c:${item.clientId}` : `i:${item.id}`;
+    const previous = map.get(key);
+    map.set(key, previous ? { ...previous, ...item } : item);
+  }
+  return [...map.values()].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+function toTimestamp(value: string): number {
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : Date.now();
+}
+
+function cachedToMessage(
+  item: {
+    id: string;
+    clientId: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    createdAt: number;
+    status: "sending" | "sent" | "failed";
+  },
+  currentUserId: string,
+): Message {
+  const [left, right] = item.conversationId.split("__");
+  const conversationUserId = left === currentUserId ? (right ?? "") : (left ?? "");
+  return {
+    id: item.id,
+    clientId: item.clientId,
+    conversationUserId,
+    senderId: item.senderId,
+    text: item.body,
+    createdAt: new Date(item.createdAt).toISOString(),
+    status: item.status,
+  };
 }
 
 export function useConversationMessages(otherUserId: string): UseConversationMessagesResult {
@@ -32,6 +87,7 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isFlushingRef = useRef(false);
   const hasValidParticipants = useMemo(
     () => isUuid(currentUserId) && isUuid(otherUserId),
     [currentUserId, otherUserId],
@@ -43,6 +99,81 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
     return makeConversationKey(currentUserId, otherUserId);
   }, [currentUserId, otherUserId, hasValidParticipants]);
 
+  const syncFromServer = useCallback(async () => {
+    if (!currentUserId || !conversationKey) return;
+    const lastSync = await getLastSync(conversationKey);
+    const since = lastSync ? new Date(lastSync).toISOString() : undefined;
+    const remote = await fetchMessages({
+      conversationKey,
+      currentUserId,
+      limit: 100,
+      since,
+    });
+    if (remote.length === 0) return;
+
+    await upsertMessages(
+      remote.map((item) => ({
+        id: item.id,
+        clientId: item.clientId ?? item.id,
+        conversationId: conversationKey,
+        senderId: item.senderId,
+        body: item.text,
+        createdAt: toTimestamp(item.createdAt),
+        status: item.status ?? "sent",
+      })),
+    );
+
+    const latest = Math.max(...remote.map((item) => toTimestamp(item.createdAt)));
+    await setLastSync(conversationKey, latest);
+    setMessages((current) => mergeMessages(current, remote));
+  }, [conversationKey, currentUserId]);
+
+  const flushOutbox = useCallback(async () => {
+    if (!currentUserId || !conversationKey || !navigator.onLine || isFlushingRef.current) return;
+    isFlushingRef.current = true;
+
+    try {
+      const pending = await listOutbox(conversationKey);
+      for (const item of pending) {
+        try {
+          const saved = await sendMessage({
+            conversationKey: item.payload.conversationId,
+            senderId: item.payload.senderId,
+            receiverId: item.payload.receiverId,
+            text: item.payload.text,
+            clientId: item.clientId,
+          });
+
+          await updateMessageDelivery(item.clientId, {
+            id: saved.id,
+            conversationId: conversationKey,
+            senderId: saved.senderId,
+            body: saved.text,
+            createdAt: toTimestamp(saved.createdAt),
+            status: "sent",
+          });
+          await setLastSync(conversationKey, toTimestamp(saved.createdAt));
+
+          setMessages((current) =>
+            current.map((msg) =>
+              msg.clientId === item.clientId
+                ? { ...saved, clientId: item.clientId, status: "sent" }
+                : msg,
+            ),
+          );
+        } catch (reason) {
+          const message = reason instanceof Error ? reason.message : "Falha ao reenviar mensagem.";
+          await markMessageFailed(item.clientId, message);
+          setMessages((current) =>
+            current.map((msg) => (msg.clientId === item.clientId ? { ...msg, status: "failed" } : msg)),
+          );
+        }
+      }
+    } finally {
+      isFlushingRef.current = false;
+    }
+  }, [conversationKey, currentUserId]);
+
   useEffect(() => {
     if (!hasValidParticipants) {
       setMessages([]);
@@ -51,7 +182,7 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
       return;
     }
 
-    if (!conversationKey) {
+    if (!conversationKey || !currentUserId) {
       setMessages([]);
       return;
     }
@@ -60,31 +191,67 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
     setLoading(true);
     setError(null);
 
-    void fetchMessages({ conversationKey, limit: 50 })
-      .then((list) => {
+    void getMessagesByConversation(conversationKey)
+      .then((cached) => {
         if (!active) return;
-        setMessages(list);
+        const mapped = cached.map((item) => cachedToMessage(item, currentUserId));
+        setMessages(mapped);
       })
       .catch((reason) => {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "Falha ao carregar mensagens.");
+        setError(reason instanceof Error ? reason.message : "Falha ao ler cache local.");
       })
       .finally(() => {
         if (!active) return;
         setLoading(false);
       });
 
+    void syncFromServer().catch((reason) => {
+      if (!active) return;
+      setError(reason instanceof Error ? reason.message : "Falha ao sincronizar mensagens.");
+    });
+
+    void flushOutbox();
+
+    const handleOnline = () => {
+      void flushOutbox().then(() => syncFromServer()).catch(() => undefined);
+    };
+    window.addEventListener("online", handleOnline);
+
     let unsubscribe: (() => void) | null = null;
     try {
-      unsubscribe = subscribeToConversationMessages(conversationKey, {
+      unsubscribe = subscribeToConversationMessages(conversationKey, currentUserId, {
         onInsert: (incoming) => {
-          setMessages((current) => {
-            if (current.some((item) => item.id === incoming.id)) return current;
-            return [...current, incoming];
-          });
+          const normalized = { ...incoming, status: incoming.status ?? "sent" };
+          void upsertMessages([
+            {
+              id: normalized.id,
+              clientId: normalized.clientId ?? normalized.id,
+              conversationId: conversationKey,
+              senderId: normalized.senderId,
+              body: normalized.text,
+              createdAt: toTimestamp(normalized.createdAt),
+              status: normalized.status,
+            },
+          ]);
+          void setLastSync(conversationKey, toTimestamp(normalized.createdAt));
+          setMessages((current) => mergeMessages(current, [normalized]));
         },
         onUpdate: (incoming) => {
-          setMessages((current) => upsertMessage(current, incoming));
+          const normalized = { ...incoming, status: incoming.status ?? "sent" };
+          void upsertMessages([
+            {
+              id: normalized.id,
+              clientId: normalized.clientId ?? normalized.id,
+              conversationId: conversationKey,
+              senderId: normalized.senderId,
+              body: normalized.text,
+              createdAt: toTimestamp(normalized.createdAt),
+              status: normalized.status,
+            },
+          ]);
+          void setLastSync(conversationKey, toTimestamp(normalized.createdAt));
+          setMessages((current) => upsertMessage(current, normalized));
         },
       });
     } catch (reason) {
@@ -95,9 +262,10 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
 
     return () => {
       active = false;
+      window.removeEventListener("online", handleOnline);
       unsubscribe?.();
     };
-  }, [conversationKey, hasValidParticipants]);
+  }, [conversationKey, currentUserId, flushOutbox, hasValidParticipants, syncFromServer]);
 
   const send = async (text: string) => {
     if (!currentUserId || !otherUserId || !conversationKey || !hasValidParticipants) {
@@ -109,17 +277,37 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
     if (!trimmed) return;
 
     const clientId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
     const optimistic: Message = {
       id: `client:${clientId}`,
       clientId,
       conversationUserId: otherUserId,
       senderId: currentUserId,
       text: trimmed,
-      createdAt: new Date().toISOString(),
+      createdAt,
       status: "sending",
     };
 
-    setMessages((current) => [...current, optimistic]);
+    setMessages((current) => mergeMessages(current, [optimistic]));
+    await putPendingMessage(
+      {
+        id: optimistic.id,
+        clientId,
+        conversationId: conversationKey,
+        senderId: currentUserId,
+        body: trimmed,
+        createdAt: toTimestamp(createdAt),
+        status: "sending",
+      },
+      {
+        conversationId: conversationKey,
+        senderId: currentUserId,
+        receiverId: otherUserId,
+        text: trimmed,
+      },
+    );
+
+    if (!navigator.onLine) return;
 
     try {
       const saved = await sendMessage({
@@ -130,16 +318,28 @@ export function useConversationMessages(otherUserId: string): UseConversationMes
         clientId,
       });
 
+      await updateMessageDelivery(clientId, {
+        id: saved.id,
+        conversationId: conversationKey,
+        senderId: saved.senderId,
+        body: saved.text,
+        createdAt: toTimestamp(saved.createdAt),
+        status: "sent",
+      });
+      await setLastSync(conversationKey, toTimestamp(saved.createdAt));
+
       setMessages((current) =>
         current.map((item) =>
           item.clientId === clientId ? { ...saved, clientId, status: "sent" } : item,
         ),
       );
     } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Falha ao enviar mensagem.";
+      await markMessageFailed(clientId, message);
       setMessages((current) =>
         current.map((item) => (item.clientId === clientId ? { ...item, status: "failed" } : item)),
       );
-      setError(reason instanceof Error ? reason.message : "Falha ao enviar mensagem.");
+      setError(message);
     }
   };
 

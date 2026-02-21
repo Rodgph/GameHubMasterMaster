@@ -3,6 +3,7 @@ import type { Message } from "../types/message";
 
 type DbMessageRow = {
   id: string;
+  conversation_key: string;
   sender_id: string;
   receiver_id: string;
   text: string;
@@ -15,10 +16,11 @@ type RealtimeHandlers = {
   onUpdate: (message: Message) => void;
 };
 
-function toUiMessage(row: DbMessageRow): Message {
+function toUiMessage(row: DbMessageRow, currentUserId: string): Message {
+  const conversationUserId = row.sender_id === currentUserId ? row.receiver_id : row.sender_id;
   return {
     id: row.id,
-    conversationUserId: row.receiver_id,
+    conversationUserId,
     senderId: row.sender_id,
     text: row.text,
     createdAt: row.created_at,
@@ -28,6 +30,7 @@ function toUiMessage(row: DbMessageRow): Message {
 
 export function subscribeToConversationMessages(
   conversationKey: string,
+  currentUserId: string,
   handlers: RealtimeHandlers,
 ) {
   const supabase = getSupabaseClient();
@@ -41,7 +44,7 @@ export function subscribeToConversationMessages(
         table: "chat_messages",
         filter: `conversation_key=eq.${conversationKey}`,
       },
-      (payload) => handlers.onInsert(toUiMessage(payload.new as DbMessageRow)),
+      (payload) => handlers.onInsert(toUiMessage(payload.new as DbMessageRow, currentUserId)),
     )
     .on(
       "postgres_changes",
@@ -51,7 +54,7 @@ export function subscribeToConversationMessages(
         table: "chat_messages",
         filter: `conversation_key=eq.${conversationKey}`,
       },
-      (payload) => handlers.onUpdate(toUiMessage(payload.new as DbMessageRow)),
+      (payload) => handlers.onUpdate(toUiMessage(payload.new as DbMessageRow, currentUserId)),
     )
     .subscribe();
 

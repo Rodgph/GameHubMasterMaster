@@ -64,6 +64,46 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/chat/profile/:userId",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/story/create",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/story/:userId",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/group/create",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/server/create",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
     path: "/",
     element: (
       <RequireLoggedUser>

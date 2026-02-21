@@ -40,6 +40,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .user-search-title {
@@ -64,4 +65,11 @@
   display: flex;
   align-items: center;
   padding: 0 12px;
+}
+
+.user-search-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }

@@ -19,3 +19,44 @@
 .chat-list-item:active {
   background: #111111;
 }
+
+.chat-list-item-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chat-list-item-title-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.chat-list-item-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-list-item-subtitle {
+  font-size: 14px;
+  color: #7a7a7a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-peek-inline {
+  margin-left: 20px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+}

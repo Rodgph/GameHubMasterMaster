@@ -1,8 +1,13 @@
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { FiBell, FiBellOff, FiMail, FiStar, FiTrash2 } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { RiUserFollowLine, RiUserUnfollowLine } from "react-icons/ri";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
-import { ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
+import { followUser, unfollowUser } from "../data/follows.repository";
+import { listActiveStoriesByUserIds } from "../data/stories.repository";
+import { FloatingCreateMenu, ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
+import { useFollowedProfiles } from "../hooks/useFollowedProfiles";
 import { useUserSearch, type UserSearchItem } from "../hooks/useUserSearch";
 import {
   addOpenConversation,
@@ -13,12 +18,14 @@ import {
   toggleMuted,
   togglePinned,
 } from "../utils/openConversations";
-import { ContextMenuItem, ContextMenuOverlay } from "../../../shared/ui";
 import { ChatHomeRoute } from "./ChatHomeRoute";
 
 export function ChatHomeLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const logout = useSessionStore((state) => state.logout);
+  const currentUser = useSessionStore((state) => state.user);
+  const currentUserId = useSessionStore((state) => state.user?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [openConversations, setOpenConversations] = useState(getOpenConversations);
@@ -28,10 +35,69 @@ export function ChatHomeLayout() {
   const [contextY, setContextY] = useState(0);
   const [contextUserId, setContextUserId] = useState<string | null>(null);
   const { users: searchUsers, loading: searchLoading } = useUserSearch(searchQuery);
+  const { profiles: followedProfiles, refresh: refreshFollowedProfiles } = useFollowedProfiles();
+  const [storyUserIds, setStoryUserIds] = useState<Set<string>>(new Set());
+  const followedIds = useMemo(() => new Set(followedProfiles.map((item) => item.id)), [followedProfiles]);
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      const storyOwners = [
+        ...new Set(
+          [
+            ...followedProfiles.map((item) => item.id),
+            ...(currentUserId ? [currentUserId] : []),
+          ].filter(Boolean),
+        ),
+      ];
+
+      if (storyOwners.length === 0) {
+        setStoryUserIds(new Set());
+        return;
+      }
+      try {
+        const activeStories = await listActiveStoriesByUserIds(storyOwners);
+        if (!active) return;
+        setStoryUserIds(new Set(activeStories.map((story) => story.user_id)));
+      } catch {
+        if (!active) return;
+        setStoryUserIds(new Set());
+      }
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [currentUserId, followedProfiles, location.pathname]);
+
   const contextConversation =
     contextUserId === null
       ? null
       : (openConversations.find((conversation) => conversation.userId === contextUserId) ?? null);
+  const stories = useMemo(
+    () => {
+      const followedStories = followedProfiles
+        .filter((item) => storyUserIds.has(item.id))
+        .map((item) => ({
+          id: item.id,
+          name: item.username,
+          avatar: item.avatar_url,
+        }));
+
+      if (!currentUserId || !storyUserIds.has(currentUserId)) {
+        return followedStories;
+      }
+
+      return [
+        {
+          id: currentUserId,
+          name: currentUser?.username || "Voce",
+          avatar: currentUser?.avatar_url,
+        },
+        ...followedStories.filter((item) => item.id !== currentUserId),
+      ];
+    },
+    [currentUser, currentUserId, followedProfiles, storyUserIds],
+  );
 
   const chatItems = useMemo(
     () =>
@@ -121,6 +187,87 @@ export function ChatHomeLayout() {
     closeContextMenu();
   };
 
+  const handleFollowUser = async (targetUserId: string) => {
+    if (!currentUserId || !targetUserId || currentUserId === targetUserId) return;
+    try {
+      await followUser({ followerId: currentUserId, followedId: targetUserId });
+      await refreshFollowedProfiles();
+    } catch {
+      // keep silent for now; follow action is best-effort
+    }
+  };
+
+  const handleUnfollowUser = async (targetUserId: string) => {
+    if (!currentUserId || !targetUserId || currentUserId === targetUserId) return;
+    try {
+      await unfollowUser({ followerId: currentUserId, followedId: targetUserId });
+      await refreshFollowedProfiles();
+    } catch {
+      // keep silent for now; unfollow action is best-effort
+    }
+  };
+
+  const handleFollowFromContext = async () => {
+    if (!contextUserId) return;
+    if (followedIds.has(contextUserId)) {
+      await handleUnfollowUser(contextUserId);
+    } else {
+      await handleFollowUser(contextUserId);
+    }
+    closeContextMenu();
+  };
+  const contextItems = useMemo<ContextMenuBaseItem[]>(
+    () => [
+      {
+        id: "pin",
+        label: contextConversation?.pinned ? "Desafixar conversa" : "Fixar conversa",
+        icon: <FiStar size={16} />,
+        onClick: handleTogglePinned,
+      },
+      {
+        id: "mute",
+        label: contextConversation?.muted ? "Ativar notificacoes" : "Silenciar",
+        icon: contextConversation?.muted ? <FiBellOff size={16} /> : <FiBell size={16} />,
+        onClick: handleToggleMuted,
+      },
+      {
+        id: "follow",
+        label: contextUserId && followedIds.has(contextUserId) ? "Deixar de seguir" : "Seguir",
+        icon:
+          contextUserId && followedIds.has(contextUserId) ? (
+            <RiUserUnfollowLine size={16} />
+          ) : (
+            <RiUserFollowLine size={16} />
+          ),
+        onClick: handleFollowFromContext,
+      },
+      {
+        id: "unread",
+        label: "Marcar como nao lida",
+        icon: <FiMail size={16} />,
+        onClick: handleMarkUnread,
+      },
+      { id: "divider", label: "", kind: "divider" },
+      {
+        id: "remove",
+        label: "Remover conversa",
+        icon: <FiTrash2 size={16} />,
+        onClick: handleRemoveConversation,
+      },
+    ],
+    [
+      contextConversation?.muted,
+      contextConversation?.pinned,
+      contextUserId,
+      followedIds,
+      handleFollowFromContext,
+      handleMarkUnread,
+      handleRemoveConversation,
+      handleToggleMuted,
+      handleTogglePinned,
+    ],
+  );
+
   return (
     <div className="chat-home-layout" data-no-drag="true">
       <ModuleHeader
@@ -131,6 +278,8 @@ export function ChatHomeLayout() {
           setActiveSearchIndex(0);
         }}
         onSearchKeyDown={handleSearchKeyDown}
+        stories={stories}
+        onOpenStory={(storyId) => navigate(`/chat/story/${storyId}`)}
       />
       <div className="chat-home-layout-content" data-no-drag="true">
         <ChatHomeRoute
@@ -141,6 +290,8 @@ export function ChatHomeLayout() {
             navigate(`/chat/u/${userId}`);
           }}
           onOpenContextMenu={({ x, y, userId }) => {
+            // Force-close any other open context menu layers (e.g. workspace Radix menu)
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
             setContextX(x);
             setContextY(y);
             setContextUserId(userId);
@@ -153,6 +304,21 @@ export function ChatHomeLayout() {
         items={searchUsers}
         loading={searchLoading}
         onSelectUser={handleSelectUser}
+        onViewProfile={(user) => {
+          setSearchQuery("");
+          setActiveSearchIndex(0);
+          navigate(`/chat/profile/${user.id}`);
+        }}
+        onFollowUser={async (user) => {
+          if (followedIds.has(user.id)) {
+            await handleUnfollowUser(user.id);
+          } else {
+            await handleFollowUser(user.id);
+          }
+          setSearchQuery("");
+          setActiveSearchIndex(0);
+        }}
+        isUserFollowed={(userId) => followedIds.has(userId)}
         onClose={() => setSearchQuery("")}
       />
       <SettingsMenuOverlay
@@ -165,29 +331,18 @@ export function ChatHomeLayout() {
           navigate("/login", { replace: true });
         }}
       />
-      <ContextMenuOverlay isOpen={contextOpen} x={contextX} y={contextY} onClose={closeContextMenu}>
-        <ContextMenuItem
-          label={contextConversation?.pinned ? "Desafixar conversa" : "Fixar conversa"}
-          icon={<FiStar size={16} />}
-          onClick={handleTogglePinned}
-        />
-        <ContextMenuItem
-          label={contextConversation?.muted ? "Ativar notificacoes" : "Silenciar"}
-          icon={contextConversation?.muted ? <FiBellOff size={16} /> : <FiBell size={16} />}
-          onClick={handleToggleMuted}
-        />
-        <ContextMenuItem
-          label="Marcar como nao lida"
-          icon={<FiMail size={16} />}
-          onClick={handleMarkUnread}
-        />
-        <div className="chat-context-divider" />
-        <ContextMenuItem
-          label="Remover conversa"
-          icon={<FiTrash2 size={16} />}
-          onClick={handleRemoveConversation}
-        />
-      </ContextMenuOverlay>
+      <ContextMenuBase
+        open={contextOpen}
+        anchorPoint={{ x: contextX, y: contextY }}
+        onClose={closeContextMenu}
+        items={contextItems}
+        dividerClassName="chat-context-divider"
+      />
+      <FloatingCreateMenu
+        onCreateStory={() => navigate("/chat/story/create")}
+        onCreateGroup={() => navigate("/chat/group/create")}
+        onCreateServer={() => navigate("/chat/server/create")}
+      />
     </div>
   );
 }
