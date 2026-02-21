@@ -1,0 +1,46 @@
+.welcome-module {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.welcome-module h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.welcome-module p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.welcome-modules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-module-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.welcome-module-item strong {
+  display: block;
+}
+
+.welcome-module-item span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.welcome-continue {
+  height: 36px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}

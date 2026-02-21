@@ -1,0 +1,21 @@
+name = "gamehubmastermaster-api"
+main = "src/index.ts"
+compatibility_date = "2026-02-21"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gamehubmastermaster"
+database_id = "9b3889d1-b36c-4dd3-b76e-18dbc15aa1f8"
+
+[[durable_objects.bindings]]
+name = "REALTIME"
+class_name = "RealtimeDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RealtimeDO"]
+
+[vars]
+SUPABASE_PROJECT_URL = "https://rvtwvaenkbpyktijbjdf.supabase.co"
+SUPABASE_JWT_ISS = "https://rvtwvaenkbpyktijbjdf.supabase.co/auth/v1"
+SUPABASE_JWT_AUD = "authenticated"
