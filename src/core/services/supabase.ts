@@ -11,9 +11,7 @@ export function getSupabaseClient() {
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Config ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env",
-    );
+    throw new Error("Config ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env");
   }
 
   cachedClient = createClient(supabaseUrl, supabaseAnonKey);

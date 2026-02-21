@@ -1,0 +1,19 @@
+.base-pill-input {
+  flex: 1;
+  height: 34px;
+  border-radius: 100px;
+  background: #020202;
+  border: none;
+  outline: none;
+  padding: 0 14px;
+  color: var(--text-primary);
+}
+
+.base-pill-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.base-pill-input:focus {
+  background: #0a0a0a;
+  outline: none;
+}

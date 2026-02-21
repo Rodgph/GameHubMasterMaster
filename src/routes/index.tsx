@@ -24,6 +24,46 @@ export const router = createBrowserRouter([
   { path: "/register", element: <RegisterPage /> },
   { path: "/widget", element: <WidgetWindow /> },
   {
+    path: "/chat",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/u/:userId",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/favs",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/settings",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
+    path: "/chat/account",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
     path: "/",
     element: (
       <RequireLoggedUser>

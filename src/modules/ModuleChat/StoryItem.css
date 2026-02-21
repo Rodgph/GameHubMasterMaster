@@ -1,0 +1,35 @@
+.story-item {
+  width: 65px;
+  height: 80px;
+  background: #020202;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  flex: 0 0 auto;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+
+.story-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 20px;
+  display: block;
+}
+
+.story-item-name {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #7a7a7a;
+  font-weight: 500;
+  text-align: center;
+  width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

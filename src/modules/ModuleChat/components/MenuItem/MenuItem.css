@@ -1,0 +1,44 @@
+.settings-menu-item {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 14px;
+  background: #020202;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.settings-menu-item:hover {
+  background: #0a0a0a;
+}
+
+.settings-menu-item:active {
+  background: #111111;
+}
+
+.settings-menu-item-icon {
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-menu-item-label {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.settings-menu-item-label.is-muted {
+  color: var(--text-secondary);
+}
+
+.settings-menu-divider {
+  height: 1px;
+  background: #020202;
+  margin: 6px 6px 2px;
+}

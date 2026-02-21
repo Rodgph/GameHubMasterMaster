@@ -1,0 +1,10 @@
+.conversation-footer {
+  flex: 0 0 auto;
+  height: 64px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border-radius: 0 0 20px 20px;
+}

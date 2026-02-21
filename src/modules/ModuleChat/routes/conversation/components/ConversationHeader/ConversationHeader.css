@@ -1,0 +1,10 @@
+.conversation-header {
+  flex: 0 0 auto;
+  height: 56px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  background: #111111;
+  border-radius: 20px 20px 0 0;
+  gap: 10px;
+}

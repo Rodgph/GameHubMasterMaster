@@ -23,7 +23,7 @@ type DockShellProps = {
   widgetsById: Record<string, WidgetLayout>;
   onDockDragMove: (movingId: string, x: number, y: number) => void;
   onDockDragEnd: (movingId: string, x: number, y: number, didDrag: boolean) => void;
-  onDockTabDragStart: (payload: {
+  onDockTabDragStart?: (payload: {
     leafId: string;
     tabId: string;
     pointerX: number;
@@ -44,7 +44,7 @@ type DockShellProps = {
     pointerY: number;
     didDrag: boolean;
   }) => void;
-  onDockTabContextMenu: (payload: {
+  onDockTabContextMenu?: (payload: {
     leafId: string;
     tabId: string;
     clientX: number;
@@ -192,7 +192,7 @@ export function DockShell({
         element.classList.add("dragging");
         element.setPointerCapture(pointerId);
         moveEvent.preventDefault();
-        onDockTabDragStart({
+        onDockTabDragStart?.({
           leafId,
           tabId,
           pointerX: moveEvent.clientX,
@@ -259,7 +259,7 @@ export function DockShell({
                     onContextMenu={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      onDockTabContextMenu({
+                      onDockTabContextMenu?.({
                         leafId: node.id,
                         tabId: widget.id,
                         clientX: event.clientX,
