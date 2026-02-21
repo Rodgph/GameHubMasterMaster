@@ -348,3 +348,14 @@ export function insertTabIntoLeafById(
 
   return root;
 }
+
+export function findLeafIdByWidgetId(node: DockNode | null, widgetId: string): string | null {
+  if (!node) return null;
+  if (node.kind === "leaf") {
+    return node.widgetIds.includes(widgetId) ? node.id : null;
+  }
+
+  const left = findLeafIdByWidgetId(node.children[0], widgetId);
+  if (left) return left;
+  return findLeafIdByWidgetId(node.children[1], widgetId);
+}

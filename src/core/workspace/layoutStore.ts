@@ -7,6 +7,7 @@ import {
   insertAsTabAtLeaf,
   insertSplitAtLeaf,
   insertTabIntoLeafById,
+  findLeafIdByWidgetId,
   moveTabWithinLeaf,
   moveLeafToSplit,
   removeTabFromLeaf,
@@ -56,6 +57,7 @@ type LayoutState = {
   undockWidgetAt: (id: string, x: number, y: number) => void;
   spawnWidgetWindow: (widgetId: string) => Promise<void>;
   closeWidgetWindow: (widgetId: string) => Promise<void>;
+  popoutDockTab: (tabId: string) => Promise<void>;
   detachDockTabToWindow: (
     originLeafId: string,
     tabId: string,
@@ -299,6 +301,27 @@ export const useLayoutStore = create<LayoutState>()(
               : entry,
           ),
         }));
+      },
+      popoutDockTab: async (tabId) => {
+        const state = get();
+        const widget = state.widgets.find((entry) => entry.id === tabId);
+        if (!widget) return;
+
+        const leafId = findLeafIdByWidgetId(state.dockTree.root, tabId);
+        if (!leafId) return;
+
+        set((current) => ({
+          dockTree: {
+            root: removeTabFromLeaf(current.dockTree.root, leafId, tabId),
+          },
+        }));
+
+        if (isTauri) {
+          await get().spawnWidgetWindow(tabId);
+          return;
+        }
+
+        get().undockWidget(tabId);
       },
       detachDockTabToWindow: async (originLeafId, tabId, x, y) => {
         get().detachDockTab(originLeafId, tabId);

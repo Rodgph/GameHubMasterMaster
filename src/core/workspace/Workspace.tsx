@@ -4,6 +4,8 @@ import { moduleRegistry } from "../modules/registry";
 import type { DockEdge, WidgetLayout } from "./layoutStore";
 import { useLayoutStore } from "./layoutStore";
 import { DockShell } from "./shells/DockShell";
+import { PopoutZone } from "./shells/PopoutZone";
+import { TabContextMenu } from "./shells/TabContextMenu";
 import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
 import { isTauri } from "../platform/isTauri";
@@ -49,8 +51,15 @@ type TabDragSnap =
   | { kind: "reorder"; leafId: string; tabId: string; toIndex: number }
   | { kind: "panel-split"; leafId: string; tabId: string; targetId: string; side: DockEdge }
   | { kind: "panel-tab"; leafId: string; tabId: string; targetId: string }
-  | { kind: "undock"; leafId: string; tabId: string }
   | null;
+
+type TabContextMenuState = {
+  open: boolean;
+  x: number;
+  y: number;
+  leafId: string | null;
+  tabId: string | null;
+};
 
 export function Workspace() {
   const widgets = useLayoutStore((state) => state.widgets);
@@ -63,16 +72,29 @@ export function Workspace() {
   const closeWidgetWindow = useLayoutStore((state) => state.closeWidgetWindow);
   const reorderDockTab = useLayoutStore((state) => state.reorderDockTab);
   const detachDockTab = useLayoutStore((state) => state.detachDockTab);
-  const detachDockTabToWindow = useLayoutStore((state) => state.detachDockTabToWindow);
+  const popoutDockTab = useLayoutStore((state) => state.popoutDockTab);
+  const closeDockTab = useLayoutStore((state) => state.closeDockTab);
   const moveDockedWidget = useLayoutStore((state) => state.moveDockedWidget);
   const undockWidgetAt = useLayoutStore((state) => state.undockWidgetAt);
   const resetLayout = useLayoutStore((state) => state.resetLayout);
   const canvasRef = useRef<HTMLElement | null>(null);
+  const popoutZoneRef = useRef<HTMLElement | null>(null);
   const snapRef = useRef<SnapState>(null);
   const dockDragRef = useRef<DockDragSnap>(null);
   const tabDragRef = useRef<TabDragSnap>(null);
   const [snapState, setSnapState] = useState<SnapState | null>(null);
   const [dockDragSnap, setDockDragSnap] = useState<DockDragSnap>(null);
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const [dragPassedThreshold, setDragPassedThreshold] = useState(false);
+  const [popoutIntent, setPopoutIntent] = useState(false);
+  const [overPopoutZone, setOverPopoutZone] = useState(false);
+  const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
+    open: false,
+    x: 0,
+    y: 0,
+    leafId: null,
+    tabId: null,
+  });
 
   const floatingWidgets = useMemo(
     () => widgets.filter((widget) => widget.mode === "widget" && widget.host !== "tauri"),
@@ -203,6 +225,18 @@ export function Workspace() {
       pointerX > rect.right + DOCK_UNDOCK_MARGIN ||
       pointerY < rect.top - DOCK_UNDOCK_MARGIN ||
       pointerY > rect.bottom + DOCK_UNDOCK_MARGIN
+    );
+  };
+
+  const getIsOverPopoutZone = (pointerX: number, pointerY: number) => {
+    const popoutZone = popoutZoneRef.current;
+    if (!popoutZone) return false;
+    const rect = popoutZone.getBoundingClientRect();
+    return (
+      pointerX >= rect.left &&
+      pointerX <= rect.right &&
+      pointerY >= rect.top &&
+      pointerY <= rect.bottom
     );
   };
 
@@ -350,38 +384,64 @@ export function Workspace() {
     return index;
   };
 
-  const handleDockTabDragMove = ({
-    leafId,
+  const resetTabDragRuntime = () => {
+    tabDragRef.current = null;
+    setDraggingTabId(null);
+    setDragPassedThreshold(false);
+    setPopoutIntent(false);
+    setOverPopoutZone(false);
+  };
+
+  const handleDockTabDragStart = ({
     tabId,
     pointerX,
     pointerY,
+    altKey,
   }: {
     leafId: string;
     tabId: string;
     pointerX: number;
     pointerY: number;
+    altKey: boolean;
+  }) => {
+    setDraggingTabId(tabId);
+    setDragPassedThreshold(true);
+    setPopoutIntent(altKey);
+    setOverPopoutZone(getIsOverPopoutZone(pointerX, pointerY));
+  };
+
+  const handleDockTabDragMove = ({
+    leafId,
+    tabId,
+    pointerX,
+    pointerY,
+    altKey,
+  }: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+    altKey: boolean;
   }) => {
     let next: TabDragSnap = null;
+    setPopoutIntent(altKey);
+    setOverPopoutZone(getIsOverPopoutZone(pointerX, pointerY));
 
-    if (isOutsideDockRootWithMargin(pointerX, pointerY)) {
-      next = { kind: "undock", leafId, tabId };
+    const topEl = document.elementFromPoint(pointerX, pointerY) as HTMLElement | null;
+    const sameLeafTab = topEl?.closest(`[data-dock-leaf-id="${leafId}"]`);
+    const sameLeafTabs = topEl?.closest(`[data-dock-tabs-leaf-id="${leafId}"]`);
+    if (sameLeafTab || sameLeafTabs) {
+      next = { kind: "reorder", leafId, tabId, toIndex: getReorderIndexInLeaf(leafId, pointerX) };
     } else {
-      const topEl = document.elementFromPoint(pointerX, pointerY) as HTMLElement | null;
-      const sameLeafTab = topEl?.closest(`[data-dock-leaf-id="${leafId}"]`);
-      const sameLeafTabs = topEl?.closest(`[data-dock-tabs-leaf-id="${leafId}"]`);
-      if (sameLeafTab || sameLeafTabs) {
-        next = { kind: "reorder", leafId, tabId, toIndex: getReorderIndexInLeaf(leafId, pointerX) };
-      } else {
-        const panelEl = getDockPanelAtPoint(pointerX, pointerY);
-        if (panelEl) {
-          const targetId = panelEl.dataset.dockWidgetId;
-          const intent = getPanelDropIntent(panelEl, pointerX, pointerY);
-          if (targetId && intent) {
-            next =
-              intent.kind === "panel-split"
-                ? { kind: "panel-split", leafId, tabId, targetId, side: intent.side }
-                : { kind: "panel-tab", leafId, tabId, targetId };
-          }
+      const panelEl = getDockPanelAtPoint(pointerX, pointerY);
+      if (panelEl) {
+        const targetId = panelEl.dataset.dockWidgetId;
+        const intent = getPanelDropIntent(panelEl, pointerX, pointerY);
+        if (targetId && intent) {
+          next =
+            intent.kind === "panel-split"
+              ? { kind: "panel-split", leafId, tabId, targetId, side: intent.side }
+              : { kind: "panel-tab", leafId, tabId, targetId };
         }
       }
     }
@@ -392,8 +452,8 @@ export function Workspace() {
   const handleDockTabDragEnd = ({
     leafId,
     tabId,
-    pointerX,
-    pointerY,
+    pointerX: _pointerX,
+    pointerY: _pointerY,
     didDrag,
   }: {
     leafId: string;
@@ -403,7 +463,13 @@ export function Workspace() {
     didDrag: boolean;
   }) => {
     if (!didDrag) {
-      tabDragRef.current = null;
+      resetTabDragRuntime();
+      return;
+    }
+
+    if (popoutIntent || overPopoutZone) {
+      void popoutDockTab(tabId);
+      resetTabDragRuntime();
       return;
     }
 
@@ -416,12 +482,53 @@ export function Workspace() {
     } else if (snap?.kind === "panel-split" && snap.leafId === leafId && snap.tabId === tabId) {
       detachDockTab(leafId, tabId);
       moveDockedWidget(tabId, snap.targetId, snap.side);
-    } else if (snap?.kind === "undock" && snap.leafId === leafId && snap.tabId === tabId) {
-      void detachDockTabToWindow(leafId, tabId, pointerX - 200, pointerY - 22);
     }
 
-    tabDragRef.current = null;
+    resetTabDragRuntime();
   };
+
+  const handleDockTabContextMenu = ({
+    leafId,
+    tabId,
+    clientX,
+    clientY,
+  }: {
+    leafId: string;
+    tabId: string;
+    clientX: number;
+    clientY: number;
+  }) => {
+    setTabContextMenu({
+      open: true,
+      x: clientX,
+      y: clientY,
+      leafId,
+      tabId,
+    });
+  };
+
+  useEffect(() => {
+    if (!draggingTabId || !dragPassedThreshold) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Alt") {
+        setPopoutIntent(true);
+      }
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Alt") {
+        setPopoutIntent(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [dragPassedThreshold, draggingTabId]);
 
   return (
     <ContextMenu.Root>
@@ -434,8 +541,10 @@ export function Workspace() {
                 widgetsById={widgetsById}
                 onDockDragMove={handleDockDragMove}
                 onDockDragEnd={handleDockDragEnd}
+                onDockTabDragStart={handleDockTabDragStart}
                 onDockTabDragMove={handleDockTabDragMove}
                 onDockTabDragEnd={handleDockTabDragEnd}
+                onDockTabContextMenu={handleDockTabContextMenu}
               />
             </section>
           ) : null}
@@ -523,6 +632,31 @@ export function Workspace() {
               )}
             </section>
           ) : null}
+          {draggingTabId && dragPassedThreshold ? (
+            <PopoutZone ref={popoutZoneRef} active={overPopoutZone} altActive={popoutIntent} />
+          ) : null}
+          <TabContextMenu
+            open={tabContextMenu.open}
+            x={tabContextMenu.x}
+            y={tabContextMenu.y}
+            onClose={() =>
+              setTabContextMenu({
+                open: false,
+                x: 0,
+                y: 0,
+                leafId: null,
+                tabId: null,
+              })
+            }
+            onPopout={() => {
+              if (!tabContextMenu.tabId) return;
+              void popoutDockTab(tabContextMenu.tabId);
+            }}
+            onCloseTab={() => {
+              if (!tabContextMenu.leafId || !tabContextMenu.tabId) return;
+              closeDockTab(tabContextMenu.leafId, tabContextMenu.tabId);
+            }}
+          />
         </main>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>

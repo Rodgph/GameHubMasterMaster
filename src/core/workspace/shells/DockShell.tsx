@@ -22,11 +22,19 @@ type DockShellProps = {
   widgetsById: Record<string, WidgetLayout>;
   onDockDragMove: (movingId: string, x: number, y: number) => void;
   onDockDragEnd: (movingId: string, x: number, y: number, didDrag: boolean) => void;
+  onDockTabDragStart: (payload: {
+    leafId: string;
+    tabId: string;
+    pointerX: number;
+    pointerY: number;
+    altKey: boolean;
+  }) => void;
   onDockTabDragMove: (payload: {
     leafId: string;
     tabId: string;
     pointerX: number;
     pointerY: number;
+    altKey: boolean;
   }) => void;
   onDockTabDragEnd: (payload: {
     leafId: string;
@@ -35,6 +43,12 @@ type DockShellProps = {
     pointerY: number;
     didDrag: boolean;
   }) => void;
+  onDockTabContextMenu: (payload: {
+    leafId: string;
+    tabId: string;
+    clientX: number;
+    clientY: number;
+  }) => void;
 };
 
 export function DockShell({
@@ -42,8 +56,10 @@ export function DockShell({
   widgetsById,
   onDockDragMove,
   onDockDragEnd,
+  onDockTabDragStart,
   onDockTabDragMove,
   onDockTabDragEnd,
+  onDockTabContextMenu,
 }: DockShellProps) {
   const closeDockTab = useLayoutStore((state) => state.closeDockTab);
   const setActiveDockTab = useLayoutStore((state) => state.setActiveDockTab);
@@ -175,12 +191,20 @@ export function DockShell({
         element.classList.add("dragging");
         element.setPointerCapture(pointerId);
         moveEvent.preventDefault();
+        onDockTabDragStart({
+          leafId,
+          tabId,
+          pointerX: moveEvent.clientX,
+          pointerY: moveEvent.clientY,
+          altKey: moveEvent.altKey,
+        });
       }
       onDockTabDragMove({
         leafId,
         tabId,
         pointerX: moveEvent.clientX,
         pointerY: moveEvent.clientY,
+        altKey: moveEvent.altKey,
       });
     };
 
@@ -231,6 +255,16 @@ export function DockShell({
                     data-dock-leaf-id={node.id}
                     data-dock-tab-id={widget.id}
                     onPointerDown={(event) => startTabDrag(event, node.id, widget.id)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onDockTabContextMenu({
+                        leafId: node.id,
+                        tabId: widget.id,
+                        clientX: event.clientX,
+                        clientY: event.clientY,
+                      });
+                    }}
                     onClick={() => setActiveDockTab(node.id, widget.id)}
                   >
                     <span>{tabModule.title}</span>
@@ -264,8 +298,10 @@ export function DockShell({
           widgetsById={widgetsById}
           onDockDragMove={onDockDragMove}
           onDockDragEnd={onDockDragEnd}
+          onDockTabDragStart={onDockTabDragStart}
           onDockTabDragMove={onDockTabDragMove}
           onDockTabDragEnd={onDockTabDragEnd}
+          onDockTabContextMenu={onDockTabContextMenu}
         />
       </div>
       <div
@@ -279,8 +315,10 @@ export function DockShell({
           widgetsById={widgetsById}
           onDockDragMove={onDockDragMove}
           onDockDragEnd={onDockDragEnd}
+          onDockTabDragStart={onDockTabDragStart}
           onDockTabDragMove={onDockTabDragMove}
           onDockTabDragEnd={onDockTabDragEnd}
+          onDockTabContextMenu={onDockTabContextMenu}
         />
       </div>
     </section>
