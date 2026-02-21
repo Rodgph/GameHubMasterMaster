@@ -57,6 +57,12 @@ function sanitizeUsername(raw: string) {
   return normalized;
 }
 
+function makeFallbackUsername(base: string, userId: string) {
+  const suffix = userId.replace(/-/g, "").slice(0, 6).toLowerCase();
+  const safeBase = base.replace(/[^a-z0-9_]/g, "").slice(0, 13).toLowerCase() || "user";
+  return `${safeBase}_${suffix}`;
+}
+
 function getBearerToken(request: Request) {
   const header = request.headers.get("authorization");
   if (header?.startsWith("Bearer ")) {
@@ -143,18 +149,45 @@ async function handleBootstrap(request: Request, env: Env, userId: string) {
     }>();
 
   if (!existing) {
-    if (!username) {
-      return json({ error: "username_required" }, request, 400);
-    }
+    const desiredUsername = username ?? makeFallbackUsername("user", userId);
+    let inserted = false;
 
     try {
       await env.DB.prepare(
         "INSERT INTO users (id, username, display_name, avatar_url) VALUES (?, ?, ?, ?)",
       )
-        .bind(userId, username, displayName ?? username, avatarUrl)
+        .bind(userId, desiredUsername, displayName ?? desiredUsername, avatarUrl)
         .run();
+      inserted = true;
     } catch {
-      return json({ error: "username_unavailable" }, request, 409);
+      // username conflict: fallback to deterministic username to avoid bootstrap deadlock
+      const fallbackUsername = makeFallbackUsername(desiredUsername, userId);
+      try {
+        await env.DB.prepare(
+          "INSERT INTO users (id, username, display_name, avatar_url) VALUES (?, ?, ?, ?)",
+        )
+          .bind(userId, fallbackUsername, displayName ?? fallbackUsername, avatarUrl)
+          .run();
+        inserted = true;
+      } catch {
+        const maybeCreated = await env.DB.prepare(
+          "SELECT id FROM users WHERE id = ?",
+        )
+          .bind(userId)
+          .first<{ id: string }>();
+        if (!maybeCreated) {
+          return json({ error: "username_unavailable" }, request, 409);
+        }
+      }
+    }
+
+    if (!inserted) {
+      const maybeCreated = await env.DB.prepare("SELECT id FROM users WHERE id = ?")
+        .bind(userId)
+        .first<{ id: string }>();
+      if (!maybeCreated) {
+        return json({ error: "bootstrap_failed" }, request, 500);
+      }
     }
   }
 

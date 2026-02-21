@@ -10,6 +10,7 @@ import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
 import { isTauri } from "../platform/isTauri";
 import { tauriListen } from "../platform/tauriEvents";
+import { GlobalSearchOverlay } from "../../shared/search/ui/GlobalSearchOverlay/GlobalSearchOverlay";
 
 const DOCK_SNAP_THRESHOLD = 24;
 const PANEL_SNAP_THRESHOLD = 56;
@@ -585,6 +586,7 @@ export function Workspace() {
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>
+      <GlobalSearchOverlay />
     </ContextMenu.Root>
   );
 }

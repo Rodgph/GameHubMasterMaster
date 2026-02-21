@@ -92,6 +92,7 @@ let ws: WebSocket | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempt = 0;
 let reconnectToken = "";
+const MAX_RECONNECT_ATTEMPTS = 6;
 
 async function getAccessToken() {
   const supabase = getSupabaseClient();
@@ -433,7 +434,12 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     });
   },
   connectWs: async () => {
-    reconnectToken = await getAccessToken();
+    try {
+      reconnectToken = await getAccessToken();
+    } catch {
+      set({ wsStatus: "disconnected" });
+      return;
+    }
     clearSocket(set, true);
 
     const open = () => {
@@ -461,6 +467,10 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
 
       ws.onclose = () => {
         if (!reconnectToken) return;
+        if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+          set({ wsStatus: "disconnected" });
+          return;
+        }
         set({ wsStatus: "reconnecting" });
         reconnectAttempt += 1;
         const delay = Math.min(500 * 2 ** (reconnectAttempt - 1), 30000);

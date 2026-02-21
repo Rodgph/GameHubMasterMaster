@@ -34,6 +34,7 @@ let roomSocket: WebSocket | null = null;
 let activeRoomSocketId: string | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 6;
 
 async function getAccessToken() {
   const supabase = getSupabaseClient();
@@ -91,7 +92,14 @@ function connectRoomWs(roomId: string, set: (patch: Partial<ChatStore>) => void)
   set({ wsStatus: "connecting" });
 
   const open = async () => {
-    const token = await getAccessToken();
+    let token = "";
+    try {
+      token = await getAccessToken();
+    } catch {
+      set({ wsStatus: "error", error: "Sessao invalida." });
+      return;
+    }
+
     const ws = new WebSocket(cloudChatRoomWsUrl(roomId, token));
     roomSocket = ws;
 
@@ -143,6 +151,10 @@ function connectRoomWs(roomId: string, set: (patch: Partial<ChatStore>) => void)
 
     ws.onclose = () => {
       if (activeRoomSocketId !== roomId) return;
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        set({ wsStatus: "error", error: "Falha ao reconectar no chat da sala." });
+        return;
+      }
       reconnectAttempts += 1;
       set({ wsStatus: "reconnecting" });
       const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempts, 5), 10000);

@@ -43,6 +43,7 @@ let realtimeSocket: WebSocket | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempts = 0;
 let activeRealtimeToken = "";
+const MAX_REALTIME_RECONNECT_ATTEMPTS = 6;
 
 type SessionSet = (
   partial: Partial<SessionStore> | ((state: SessionStore) => Partial<SessionStore>),
@@ -60,7 +61,12 @@ function clearRealtimeConnection(set: SessionSet) {
     realtimeSocket.onclose = null;
     realtimeSocket.onerror = null;
     realtimeSocket.onmessage = null;
-    realtimeSocket.close();
+    if (
+      realtimeSocket.readyState === WebSocket.OPEN ||
+      realtimeSocket.readyState === WebSocket.CONNECTING
+    ) {
+      realtimeSocket.close();
+    }
     realtimeSocket = null;
   }
 
@@ -113,6 +119,37 @@ function parseUsernameFromEmail(email: string | null | undefined) {
   return email.slice(0, at).toLowerCase();
 }
 
+function isUsernameUnavailableError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const text = error.message.toLowerCase();
+  return (
+    text.includes("duplicate key") ||
+    text.includes("unique constraint") ||
+    text.includes("chat_profiles_username") ||
+    text.includes("username")
+  );
+}
+
+async function ensureChatProfile(
+  userId: string,
+  username: string,
+  avatarUrl: string | null | undefined,
+) {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("chat_profiles").upsert(
+    {
+      id: userId,
+      username,
+      avatar_url: avatarUrl ?? null,
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 async function syncFromCloud(
   token: string,
   username?: string,
@@ -160,6 +197,10 @@ function connectRealtime(token: string, set: SessionSet, get: () => SessionStore
 
     const scheduleReconnect = () => {
       if (!activeRealtimeToken || get().user === null) return;
+      if (reconnectAttempts >= MAX_REALTIME_RECONNECT_ATTEMPTS) {
+        set(() => ({ realtimeConnected: false }));
+        return;
+      }
       set(() => ({ realtimeConnected: false }));
       reconnectAttempts += 1;
       const delay = Math.min(1000 * 2 ** Math.min(reconnectAttempts, 5), 15000);
@@ -288,6 +329,21 @@ export const useSessionStore = create<SessionStore>()(
           token = signin.data.session.access_token;
         }
 
+        const currentSession = await supabaseClient.auth.getSession();
+        const userId = currentSession.data.session?.user.id;
+        if (!userId) {
+          throw new Error("Falha ao obter usuario da sessao.");
+        }
+
+        try {
+          await ensureChatProfile(userId, username, avatarUrl ?? null);
+        } catch (profileError) {
+          if (isUsernameUnavailableError(profileError)) {
+            throw new Error("username_unavailable");
+          }
+          throw profileError;
+        }
+
         const boot = await syncFromCloud(token, username, displayName, avatarUrl ?? null);
         const mergedModules = mergeModulesMap(boot.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(mergedModules);
@@ -306,7 +362,11 @@ export const useSessionStore = create<SessionStore>()(
       logout: async () => {
         const supabaseClient = getSupabaseClient();
         clearRealtimeConnection(set);
-        await supabaseClient.auth.signOut();
+        try {
+          await supabaseClient.auth.signOut();
+        } catch {
+          // continue local cleanup even if remote logout fails (ex: 403 in dev)
+        }
         useLayoutStore.getState().resetLayout();
         set({
           user: null,

@@ -1,5 +1,6 @@
 import { FaRegHeart } from "react-icons/fa";
 import { IoSettingsOutline } from "react-icons/io5";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { BaseIconButton, BasePillInput } from "../../shared/ui";
 import { StoryItem } from "./StoryItem";
 import "./ModuleHeader.css";
@@ -14,13 +15,26 @@ const mockStories = [
 
 type ModuleHeaderProps = {
   onSettingsClick?: () => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearchKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
 };
 
-export function ModuleHeader({ onSettingsClick }: ModuleHeaderProps) {
+export function ModuleHeader({
+  onSettingsClick,
+  searchValue = "",
+  onSearchChange,
+  onSearchKeyDown,
+}: ModuleHeaderProps) {
   return (
     <header className="module-header" data-no-drag="true">
       <div className="module-header-top-row" data-no-drag="true">
-        <BasePillInput placeholder="Pesquisar usuarios..." />
+        <BasePillInput
+          placeholder="Pesquisar usuarios..."
+          value={searchValue}
+          onChange={(event) => onSearchChange?.(event.target.value)}
+          onKeyDown={onSearchKeyDown}
+        />
         <BaseIconButton aria-label="Favoritos">
           <FaRegHeart size={17} />
         </BaseIconButton>

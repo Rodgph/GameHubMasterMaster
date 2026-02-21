@@ -1,0 +1,11 @@
+{
+  "productName": "GameHub (Alt)",
+  "identifier": "com.gamehub.master.alt",
+  "app": {
+    "windows": [
+      {
+        "title": "GameHub (Alt)"
+      }
+    ]
+  }
+}
