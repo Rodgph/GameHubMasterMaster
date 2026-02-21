@@ -28,6 +28,7 @@ export type WidgetLayout = {
   mode: ModuleMode;
   host?: WidgetHost;
   windowLabel?: string;
+  pinned?: boolean;
   x: number;
   y: number;
   w: number;
@@ -38,10 +39,18 @@ export type WidgetLayout = {
 type LayoutState = {
   widgets: WidgetLayout[];
   dockTree: DockTree;
+  moduleRuntimeStateByWidgetId: Record<string, unknown>;
+  windowBackgroundModeByWidgetId: Record<string, boolean>;
   addWidget: (moduleId: ModuleId) => void;
+  duplicateWidget: (widgetId: string) => void;
+  togglePinWidget: (widgetId: string) => void;
+  reattachWidgetToDock: (widgetId: string) => Promise<void>;
   ensureModuleDocked: (moduleId: ModuleId) => void;
   closeWidgetsByModule: (moduleId: ModuleId) => void;
   applyEnabledModules: (enabledMap: Record<string, boolean>) => void;
+  setWidgetRuntimeState: (widgetId: string, state: unknown) => void;
+  clearWidgetRuntimeState: (widgetId: string) => void;
+  setWindowBackgroundMode: (widgetId: string, isBackground: boolean) => void;
   closeWidget: (id: string) => void;
   updateWidget: (id: string, patch: Partial<WidgetLayout>) => void;
   bringToFront: (id: string) => void;
@@ -86,6 +95,8 @@ export const useLayoutStore = create<LayoutState>()(
     (set, get) => ({
       widgets: [],
       dockTree: createEmptyDockTree(),
+      moduleRuntimeStateByWidgetId: {},
+      windowBackgroundModeByWidgetId: {},
       addWidget: (moduleId) =>
         set((state) => {
           const constraints = moduleRegistryById[moduleId].widgetConstraints;
@@ -104,6 +115,40 @@ export const useLayoutStore = create<LayoutState>()(
           };
           return { widgets: [...state.widgets, widget] };
         }),
+      duplicateWidget: (widgetId) =>
+        set((state) => {
+          const source = state.widgets.find((widget) => widget.id === widgetId);
+          if (!source) return state;
+          const duplicated: WidgetLayout = {
+            ...source,
+            id: crypto.randomUUID(),
+            x: source.x + 24,
+            y: source.y + 24,
+            z: getNextZ(state.widgets),
+          };
+          return { widgets: [...state.widgets, duplicated] };
+        }),
+      togglePinWidget: (widgetId) =>
+        set((state) => ({
+          widgets: state.widgets.map((widget) =>
+            widget.id === widgetId ? { ...widget, pinned: !widget.pinned } : widget,
+          ),
+        })),
+      reattachWidgetToDock: async (widgetId) => {
+        const state = get();
+        const current = state.widgets.find((widget) => widget.id === widgetId);
+        if (!current) return;
+
+        if (current.mode === "dock") return;
+        const firstDockedWidget = state.widgets.find(
+          (widget) => widget.mode === "dock" && widget.id !== widgetId,
+        );
+        if (firstDockedWidget) {
+          get().dockAsTab(widgetId, firstDockedWidget.id);
+        } else {
+          get().dockWidget(widgetId, "right");
+        }
+      },
       ensureModuleDocked: (moduleId) =>
         set((state) => {
           const existing = state.widgets.find((widget) => widget.moduleId === moduleId);
@@ -153,6 +198,11 @@ export const useLayoutStore = create<LayoutState>()(
           return {
             widgets: state.widgets.filter((widget) => widget.moduleId !== moduleId),
             dockTree: { root: nextRoot },
+            moduleRuntimeStateByWidgetId: Object.fromEntries(
+              Object.entries(state.moduleRuntimeStateByWidgetId).filter(
+                ([widgetId]) => !idsToRemove.includes(widgetId),
+              ),
+            ),
           };
         }),
       applyEnabledModules: (enabledMap) =>
@@ -179,8 +229,33 @@ export const useLayoutStore = create<LayoutState>()(
           return {
             widgets: state.widgets.filter((widget) => !removeIds.has(widget.id)),
             dockTree: { root: nextRoot },
+            moduleRuntimeStateByWidgetId: Object.fromEntries(
+              Object.entries(state.moduleRuntimeStateByWidgetId).filter(
+                ([widgetId]) => !removeIds.has(widgetId),
+              ),
+            ),
           };
         }),
+      setWidgetRuntimeState: (widgetId, runtimeState) =>
+        set((state) => ({
+          moduleRuntimeStateByWidgetId: {
+            ...state.moduleRuntimeStateByWidgetId,
+            [widgetId]: runtimeState,
+          },
+        })),
+      clearWidgetRuntimeState: (widgetId) =>
+        set((state) => ({
+          moduleRuntimeStateByWidgetId: Object.fromEntries(
+            Object.entries(state.moduleRuntimeStateByWidgetId).filter(([id]) => id !== widgetId),
+          ),
+        })),
+      setWindowBackgroundMode: (widgetId, isBackground) =>
+        set((state) => ({
+          windowBackgroundModeByWidgetId: {
+            ...state.windowBackgroundModeByWidgetId,
+            [widgetId]: isBackground,
+          },
+        })),
       updateWidget: (id, patch) =>
         set((state) => ({
           widgets: state.widgets.map((widget) =>
@@ -320,6 +395,11 @@ export const useLayoutStore = create<LayoutState>()(
           dockTree: {
             root: removeLeafByWidgetId(state.dockTree.root, id),
           },
+          moduleRuntimeStateByWidgetId: Object.fromEntries(
+            Object.entries(state.moduleRuntimeStateByWidgetId).filter(
+              ([widgetId]) => widgetId !== id,
+            ),
+          ),
         })),
       undockWidgetAt: (id, x, y) =>
         set((state) => ({
@@ -388,7 +468,13 @@ export const useLayoutStore = create<LayoutState>()(
         }
         get().undockWidgetAt(tabId, x, y);
       },
-      resetLayout: () => set({ widgets: [], dockTree: createEmptyDockTree() }),
+      resetLayout: () =>
+        set({
+          widgets: [],
+          dockTree: createEmptyDockTree(),
+          moduleRuntimeStateByWidgetId: {},
+          windowBackgroundModeByWidgetId: {},
+        }),
       closeWidget: (id) => {
         const widget = get().widgets.find((entry) => entry.id === id);
         if (widget?.windowLabel && isTauri) {
@@ -400,6 +486,11 @@ export const useLayoutStore = create<LayoutState>()(
           dockTree: {
             root: removeLeafByWidgetId(state.dockTree.root, id),
           },
+          moduleRuntimeStateByWidgetId: Object.fromEntries(
+            Object.entries(state.moduleRuntimeStateByWidgetId).filter(
+              ([widgetId]) => widgetId !== id,
+            ),
+          ),
         }));
       },
     }),

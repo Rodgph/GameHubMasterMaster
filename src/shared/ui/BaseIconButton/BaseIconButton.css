@@ -1,0 +1,21 @@
+.base-icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 100px;
+  background: #020202;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.15s ease;
+  color: var(--text-primary);
+}
+
+.base-icon-button:hover {
+  background: #111111;
+}
+
+.base-icon-button:active {
+  background: #181818;
+}

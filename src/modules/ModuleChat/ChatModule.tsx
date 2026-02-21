@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { matchPath, useLocation } from "react-router-dom";
 import { useSessionStore } from "../../core/stores/sessionStore";
 import { useChatStore } from "./chatStore";
+import { ChatModuleLayout } from "./ChatModuleLayout";
+import { ChatConversationRoute } from "./routes/ChatConversationRoute";
+import { ChatHomeLayout } from "./routes/ChatHomeLayout";
 import "./chat.css";
 
 export function ChatModule() {
+  const location = useLocation();
   const user = useSessionStore((state) => state.user);
   const rooms = useChatStore((state) => state.rooms);
   const activeRoomId = useChatStore((state) => state.activeRoomId);
@@ -51,128 +56,64 @@ export function ChatModule() {
     setDraft("");
   };
 
-  return (
-    <section className="chat-module" data-no-drag="true">
-      <aside className="chat-sidebar" data-no-drag="true">
-        <header className="chat-sidebar-header">
-          <h3>Salas</h3>
-          <small>{loadingRooms ? "carregando..." : `${rooms.length} sala(s)`}</small>
-        </header>
-        <div className="chat-create-room" data-no-drag="true">
-          <input
-            value={roomTitle}
-            onChange={(event) => setRoomTitle(event.target.value)}
-            placeholder="Nova sala"
-            data-no-drag="true"
-          />
-          <button type="button" onClick={() => void handleCreateRoom()} data-no-drag="true">
-            Criar
-          </button>
-        </div>
-        <div className="chat-room-list" data-scroll-region>
-          {rooms.map((room) => (
-            <button
-              key={room.roomId}
-              type="button"
-              className={`chat-room-item ${room.roomId === activeRoomId ? "active" : ""}`}
-              onClick={() => void openRoom(room.roomId)}
-              data-no-drag="true"
-            >
-              <strong>{room.title || "Sala sem titulo"}</strong>
-              <span>{room.lastMessageAt ?? "sem mensagens"}</span>
-            </button>
-          ))}
-        </div>
-      </aside>
+  void user;
+  void wsStatus;
+  void loadingRooms;
+  void loadingMessages;
+  void error;
+  void editMessage;
+  void deleteMessage;
+  void editingId;
+  void setEditingId;
+  void editingBody;
+  void setEditingBody;
+  void messages;
+  void activeRoomTitle;
+  void handleCreateRoom;
+  void handleSend;
 
-      <article className="chat-main" data-no-drag="true">
-        <header className="chat-main-header">
-          <h4>{activeRoomTitle}</h4>
-          <small>{wsStatus}</small>
-        </header>
-        <div className="chat-messages" data-scroll-region>
-          {loadingMessages ? <p>Carregando mensagens...</p> : null}
-          {messages.map((message) => {
-            const own = message.userId === user?.id;
-            const isEditing = editingId === message.id;
-            return (
-              <article key={message.id} className={`chat-message ${own ? "own" : ""}`}>
-                <header>
-                  <span>{message.userId.slice(0, 8)}</span>
-                  <small>{message.createdAt}</small>
-                </header>
-                {message.deletedAt ? (
-                  <p className="chat-message-deleted">[mensagem removida]</p>
-                ) : isEditing ? (
-                  <div className="chat-edit-row">
-                    <input
-                      value={editingBody}
-                      onChange={(event) => setEditingBody(event.target.value)}
-                      data-no-drag="true"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void editMessage(message.id, editingBody);
-                        setEditingId(null);
-                        setEditingBody("");
-                      }}
-                      data-no-drag="true"
-                    >
-                      Salvar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditingBody("");
-                      }}
-                      data-no-drag="true"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <p>{message.body}</p>
-                )}
-                {own && !message.deletedAt && !isEditing ? (
-                  <footer>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(message.id);
-                        setEditingBody(message.body);
-                      }}
-                      data-no-drag="true"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void deleteMessage(message.id)}
-                      data-no-drag="true"
-                    >
-                      Excluir
-                    </button>
-                  </footer>
-                ) : null}
-              </article>
-            );
-          })}
+  const isConversationRoute = matchPath("/chat/u/:userId", location.pathname) !== null;
+  const isFavsRoute = matchPath("/chat/favs", location.pathname) !== null;
+  const isSettingsRoute = matchPath("/chat/settings", location.pathname) !== null;
+  const isChatHomeRoute = matchPath("/chat", location.pathname) !== null;
+
+  const renderRouteContent = () => {
+    if (isConversationRoute) {
+      return <ChatConversationRoute />;
+    }
+    if (isFavsRoute) {
+      return (
+        <div className="chat-route-placeholder" data-no-drag="true">
+          Favorites
         </div>
-        <div className="chat-input-row" data-no-drag="true">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Digite uma mensagem"
-            data-no-drag="true"
-          />
-          <button type="button" onClick={() => void handleSend()} data-no-drag="true">
-            Enviar
-          </button>
+      );
+    }
+    if (isSettingsRoute) {
+      return (
+        <div className="chat-route-placeholder" data-no-drag="true">
+          Settings
         </div>
-        {error ? <p className="chat-error">{error}</p> : null}
-      </article>
-    </section>
+      );
+    }
+    if (isChatHomeRoute) {
+      return <ChatHomeLayout />;
+    }
+    return <ChatHomeLayout />;
+  };
+
+  return (
+    <ChatModuleLayout
+      header={null}
+      renderCompact={() => (
+        <div className="chat-body-empty" data-no-drag="true">
+          {renderRouteContent()}
+        </div>
+      )}
+      renderWide={() => (
+        <div className="chat-body-empty" data-no-drag="true">
+          {renderRouteContent()}
+        </div>
+      )}
+    />
   );
 }
