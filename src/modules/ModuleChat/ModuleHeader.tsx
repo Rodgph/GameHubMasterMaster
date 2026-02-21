@@ -12,15 +12,19 @@ const mockStories = [
   { id: "5", name: "Sofia", avatar: "https://i.pravatar.cc/130?img=47" },
 ];
 
-export function ModuleHeader() {
+type ModuleHeaderProps = {
+  onSettingsClick?: () => void;
+};
+
+export function ModuleHeader({ onSettingsClick }: ModuleHeaderProps) {
   return (
     <header className="module-header" data-no-drag="true">
       <div className="module-header-top-row" data-no-drag="true">
-        <BasePillInput placeholder="Pesquisar usu�rios..." />
+        <BasePillInput placeholder="Pesquisar usuarios..." />
         <BaseIconButton aria-label="Favoritos">
           <FaRegHeart size={17} />
         </BaseIconButton>
-        <BaseIconButton aria-label="Configuracoes">
+        <BaseIconButton aria-label="Configuracoes" onClick={onSettingsClick}>
           <IoSettingsOutline size={17} />
         </BaseIconButton>
       </div>

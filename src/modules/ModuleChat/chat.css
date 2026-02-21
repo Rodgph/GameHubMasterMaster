@@ -17,6 +17,7 @@
 }
 
 .chat-home-layout {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -30,8 +31,9 @@
   flex-direction: column;
 }
 
-.chat-conversation-route {
+.chat-conversation-page {
   flex: 1;
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -40,22 +42,17 @@
   overflow: hidden;
 }
 
-.chat-conversation-body {
-  flex: 1;
-  min-height: 0;
+.chat-conversation-top {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   padding: 12px 14px;
 }
 
-.chat-conversation-messages {
-  flex: 1;
+.chat-conversation-scroll {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-module);
+  overflow-x: hidden;
+  padding: 12px 14px;
 }

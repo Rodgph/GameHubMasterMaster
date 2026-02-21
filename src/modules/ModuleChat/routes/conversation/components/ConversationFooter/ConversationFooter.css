@@ -1,4 +1,5 @@
 .conversation-footer {
+  flex: 0 0 auto;
   height: 64px;
   padding: 10px 14px;
   display: flex;

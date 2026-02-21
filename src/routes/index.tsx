@@ -56,6 +56,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: "/chat/account",
+    element: (
+      <RequireLoggedUser>
+        <Workspace />
+      </RequireLoggedUser>
+    ),
+  },
+  {
     path: "/",
     element: (
       <RequireLoggedUser>

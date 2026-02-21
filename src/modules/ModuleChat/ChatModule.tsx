@@ -3,7 +3,12 @@ import { matchPath, useLocation } from "react-router-dom";
 import { useSessionStore } from "../../core/stores/sessionStore";
 import { useChatStore } from "./chatStore";
 import { ChatModuleLayout } from "./ChatModuleLayout";
-import { ChatConversationRoute, ChatHomeLayout } from "./routes";
+import {
+  ChatAccountRoute,
+  ChatConversationRoute,
+  ChatHomeLayout,
+  ChatSettingsRoute,
+} from "./routes";
 import "./chat.css";
 
 export function ChatModule() {
@@ -73,6 +78,7 @@ export function ChatModule() {
 
   const isConversationRoute = matchPath("/chat/u/:userId", location.pathname) !== null;
   const isFavsRoute = matchPath("/chat/favs", location.pathname) !== null;
+  const isAccountRoute = matchPath("/chat/account", location.pathname) !== null;
   const isSettingsRoute = matchPath("/chat/settings", location.pathname) !== null;
   const isChatHomeRoute = matchPath("/chat", location.pathname) !== null;
 
@@ -87,12 +93,11 @@ export function ChatModule() {
         </div>
       );
     }
+    if (isAccountRoute) {
+      return <ChatAccountRoute />;
+    }
     if (isSettingsRoute) {
-      return (
-        <div className="chat-route-placeholder" data-no-drag="true">
-          Settings
-        </div>
-      );
+      return <ChatSettingsRoute />;
     }
     if (isChatHomeRoute) {
       return <ChatHomeLayout />;

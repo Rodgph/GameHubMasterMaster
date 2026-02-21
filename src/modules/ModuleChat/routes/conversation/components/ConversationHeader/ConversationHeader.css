@@ -1,4 +1,5 @@
 .conversation-header {
+  flex: 0 0 auto;
   height: 56px;
   padding: 10px 14px;
   display: flex;
