@@ -3,8 +3,7 @@ import { matchPath, useLocation } from "react-router-dom";
 import { useSessionStore } from "../../core/stores/sessionStore";
 import { useChatStore } from "./chatStore";
 import { ChatModuleLayout } from "./ChatModuleLayout";
-import { ChatConversationRoute } from "./routes/ChatConversationRoute";
-import { ChatHomeLayout } from "./routes/ChatHomeLayout";
+import { ChatConversationRoute, ChatHomeLayout } from "./routes";
 import "./chat.css";
 
 export function ChatModule() {

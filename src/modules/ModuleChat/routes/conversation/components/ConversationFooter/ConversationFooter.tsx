@@ -20,6 +20,13 @@ export function ConversationFooter({
   onRecord,
 }: ConversationFooterProps) {
   const [message, setMessage] = useState("");
+  const trimmed = message.trim();
+
+  const handleSend = () => {
+    if (!trimmed) return;
+    onSend?.(trimmed);
+    setMessage("");
+  };
 
   return (
     <footer className="conversation-footer" data-no-drag="true">
@@ -27,12 +34,14 @@ export function ConversationFooter({
         placeholder="Mensagem..."
         value={message}
         onChange={(event) => setMessage(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            handleSend();
+          }
+        }}
       />
-      <BaseIconButton
-        aria-label="Enviar"
-        disabled={!message.trim()}
-        onClick={() => onSend?.(message)}
-      >
+      <BaseIconButton aria-label="Enviar" disabled={!trimmed} onClick={handleSend}>
         <LuSend size={16} />
       </BaseIconButton>
       <BaseIconButton aria-label="Emojis" onClick={() => onOpenEmoji?.()}>

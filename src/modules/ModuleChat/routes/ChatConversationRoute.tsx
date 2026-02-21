@@ -1,9 +1,12 @@
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { ConversationFooter } from "./conversation/components/ConversationFooter/ConversationFooter";
-import { ConversationHeader } from "./conversation/components/ConversationHeader/ConversationHeader";
-import { ConversationTopUserCard } from "./conversation/components/ConversationTopUserCard/ConversationTopUserCard";
-import { MessageList } from "./conversation/components/Messages/MessageList";
+import {
+  ConversationFooter,
+  ConversationHeader,
+  ConversationTopUserCard,
+  MessageList,
+} from "./conversation/components";
+import { useConversationMessages } from "./conversation/hooks/useConversationMessages";
 
 const userMockMap: Record<string, { username: string; subtitle: string; avatarUrl: string }> = {
   u1: { username: "Lana", subtitle: "online", avatarUrl: "https://i.pravatar.cc/120?img=5" },
@@ -18,6 +21,8 @@ const userMockMap: Record<string, { username: string; subtitle: string; avatarUr
 
 export function ChatConversationRoute() {
   const { userId } = useParams();
+  const conversationUserId = userId ?? "unknown";
+  const { messages, sendLocal } = useConversationMessages(conversationUserId);
 
   const user = useMemo(() => {
     if (!userId) {
@@ -49,8 +54,8 @@ export function ChatConversationRoute() {
         />
       </div>
 
-      <MessageList />
-      <ConversationFooter />
+      <MessageList messages={messages} />
+      <ConversationFooter onSend={sendLocal} />
     </section>
   );
 }
