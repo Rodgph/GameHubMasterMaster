@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isTauri } from "../../core/platform/isTauri";
 import {
   motionWallpaperApply,
+  motionWallpaperApplyWithOptions,
   motionWallpaperDebugState,
+  motionWallpaperGetMonitors,
   motionWallpaperPickVideo,
   motionWallpaperReloadHost,
   motionWallpaperSetClickThrough,
@@ -21,13 +23,24 @@ import {
 } from "./storage";
 import "./motionWallpaper.css";
 
+type AspectOption = "16:9" | "9:16" | "fill";
+type MonitorItem = {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  primary: boolean;
+};
+
 type UiStatus = MotionWallpaperStatus & {
   state: "parado" | "rodando";
 };
 
 const EMPTY_DEBUG: MotionWallpaperDebugState = {
   hostReady: false,
-  lastHostReadyAt: null,
+  hostReadyAt: null,
   lastVideoEvent: null,
   attached: false,
   parentHwnd: 0,
@@ -50,6 +63,18 @@ function formatTs(ts: number | null): string {
   return new Date(ts).toLocaleString();
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      const id = window.setTimeout(() => {
+        reject(new Error(`Timeout apos ${ms}ms`));
+      }, ms);
+      void id;
+    }),
+  ]);
+}
+
 export function MotionWallpaperModule() {
   const [config, setConfig] = useState<MotionWallpaperConfig>(() => loadMotionWallpaperConfig());
   const [status, setStatus] = useState<UiStatus>({
@@ -68,43 +93,96 @@ export function MotionWallpaperModule() {
     state: "parado",
   });
   const [debugState, setDebugState] = useState<MotionWallpaperDebugState>(EMPTY_DEBUG);
+  const [monitorsList, setMonitorsList] = useState<MonitorItem[]>([]);
+  const [monitorId, setMonitorId] = useState<string>("");
+  const [aspect, setAspect] = useState<AspectOption>("fill");
   const [busy, setBusy] = useState(false);
   const [pickError, setPickError] = useState("");
   const [actionError, setActionError] = useState("");
+  const autoApplyTimerRef = useRef<number | null>(null);
   const disabled = busy || !isTauri;
 
   useEffect(() => {
     saveMotionWallpaperConfig(config);
   }, [config]);
 
+  const refreshStatus = async () => {
+    if (!isTauri) return;
+    const [nextStatus, nextDebug] = await Promise.all([
+      motionWallpaperStatus(),
+      motionWallpaperDebugState(),
+    ]);
+    setStatus(toUiStatus(nextStatus));
+    setDebugState(nextDebug);
+  };
+
+  const run = async (label: string, fn: () => Promise<void>, timeoutMs = 10000) => {
+    setBusy(true);
+    setActionError("");
+    try {
+      await withTimeout(fn(), timeoutMs);
+      await withTimeout(refreshStatus(), 4000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setActionError(`${label}: ${message}`);
+      try {
+        await withTimeout(refreshStatus(), 4000);
+      } catch {
+        // ignore refresh errors after action failure
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyCurrent = async () => {
+    if (!config.videoPath) return;
+    await motionWallpaperStart();
+    await motionWallpaperSetVideo(config.videoPath);
+    await motionWallpaperSetVolume(config.volume);
+    await motionWallpaperSetClickThrough(config.clickThrough);
+    try {
+      await motionWallpaperApplyWithOptions(aspect, monitorId || undefined);
+    } catch {
+      await motionWallpaperApply();
+    }
+  };
+
   useEffect(() => {
     if (!isTauri) return;
     let active = true;
 
-    const refresh = async () => {
+    const init = async () => {
       try {
-        const [nextStatus, nextDebug] = await Promise.all([
-          motionWallpaperStatus(),
-          motionWallpaperDebugState(),
-        ]);
+        await withTimeout(motionWallpaperStart(), 10000);
+        const mons = await withTimeout(motionWallpaperGetMonitors(), 6000);
         if (!active) return;
-        setStatus(toUiStatus(nextStatus));
-        setDebugState(nextDebug);
+        setMonitorsList(mons);
+        const primary = mons.find((m) => m.primary) ?? mons[0];
+        if (primary) {
+          setMonitorId(primary.id);
+        }
+        await withTimeout(refreshStatus(), 4000);
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Falha ao ler motion_wallpaper_debug_state";
-        setActionError(message);
+        if (!active) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setActionError(`init: ${message}`);
       }
     };
 
-    void refresh();
+    void init();
     const id = window.setInterval(() => {
-      void refresh();
-    }, 1000);
+      void refreshStatus().catch(() => {
+        // periodic best effort
+      });
+    }, 1200);
 
     return () => {
       active = false;
       window.clearInterval(id);
+      if (autoApplyTimerRef.current !== null) {
+        window.clearTimeout(autoApplyTimerRef.current);
+      }
     };
   }, []);
 
@@ -115,88 +193,45 @@ export function MotionWallpaperModule() {
     return parts[parts.length - 1] || config.videoPath;
   }, [config.videoPath]);
 
-  const withBusy = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await fn();
-      if (isTauri) {
-        const [nextStatus, nextDebug] = await Promise.all([
-          motionWallpaperStatus(),
-          motionWallpaperDebugState(),
-        ]);
-        setStatus(toUiStatus(nextStatus));
-        setDebugState(nextDebug);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const onApply = async () => {
-    if (!config.videoPath) return;
-    try {
-      setActionError("");
-      await withBusy(async () => {
-        await motionWallpaperStart();
-        const started = await motionWallpaperStatus();
-        if (!started.hostExists) {
-          throw new Error("Host nao foi criado");
-        }
-        await motionWallpaperSetVideo(config.videoPath);
-        await motionWallpaperSetVolume(config.volume);
-        await motionWallpaperSetClickThrough(config.clickThrough);
-        await motionWallpaperApply();
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Falha ao aplicar wallpaper.";
-      setActionError(message);
-    }
+    await run("mw_apply", applyCurrent, 20000);
   };
 
   const onStop = async () => {
-    await withBusy(async () => {
-      await motionWallpaperStop();
-    });
+    await run("mw_stop", motionWallpaperStop);
   };
 
   const onPickVideo = async () => {
     if (!isTauri) return;
     try {
       setPickError("");
-      const selected = await motionWallpaperPickVideo();
+      const selected = await withTimeout(motionWallpaperPickVideo(), 10000);
       if (!selected) return;
       setConfig((prev) => ({ ...prev, videoPath: selected }));
+
+      if (autoApplyTimerRef.current !== null) {
+        window.clearTimeout(autoApplyTimerRef.current);
+      }
+      autoApplyTimerRef.current = window.setTimeout(() => {
+        void run("auto_apply", async () => {
+          await motionWallpaperSetVideo(selected);
+          await motionWallpaperSetVolume(config.volume);
+          await motionWallpaperSetClickThrough(config.clickThrough);
+          try {
+            await motionWallpaperApplyWithOptions(aspect, monitorId || undefined);
+          } catch {
+            await motionWallpaperApply();
+          }
+        }, 20000);
+      }, 200);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Falha ao abrir seletor de video.";
+      const message = error instanceof Error ? error.message : String(error);
       setPickError(message);
     }
   };
 
   const onReloadHost = async () => {
-    try {
-      setActionError("");
-      await withBusy(async () => {
-        await motionWallpaperReloadHost();
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Falha ao recarregar host.";
-      setActionError(message);
-    }
+    await run("mw_reload_host", motionWallpaperReloadHost);
   };
 
   return (
@@ -222,6 +257,39 @@ export function MotionWallpaperModule() {
         </button>
       </div>
 
+      <label className="module-item motion-row" htmlFor="mw-aspect">
+        <span>Aspecto do video</span>
+        <select
+          id="mw-aspect"
+          value={aspect}
+          onChange={(e) => setAspect(e.target.value as AspectOption)}
+          disabled={disabled}
+        >
+          <option value="fill">fill</option>
+          <option value="16:9">16:9</option>
+          <option value="9:16">9:16</option>
+        </select>
+      </label>
+
+      {monitorsList.length > 0 && (
+        <label className="module-item motion-row" htmlFor="mw-monitor">
+          <span>Monitor</span>
+          <select
+            id="mw-monitor"
+            value={monitorId}
+            onChange={(e) => setMonitorId(e.target.value)}
+            disabled={disabled}
+          >
+            {monitorsList.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.primary ? "[Primario] " : ""}
+                {m.name || m.id} ({m.width}x{m.height} @ {m.x},{m.y})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <label className="module-item motion-row" htmlFor="mw-click-through">
         <span>Modo Click-through (nao capturar clique)</span>
         <input
@@ -232,9 +300,8 @@ export function MotionWallpaperModule() {
             const next = event.target.checked;
             setConfig((prev) => ({ ...prev, clickThrough: next }));
             if (isTauri) {
-              void motionWallpaperSetClickThrough(next).then(async () => {
-                const s = await motionWallpaperStatus();
-                setStatus(toUiStatus(s));
+              void run("mw_set_click_through", async () => {
+                await motionWallpaperSetClickThrough(next);
               });
             }
           }}

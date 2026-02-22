@@ -18,10 +18,26 @@
         "height": 760,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "wallpaper_host",
+        "create": false,
+        "title": "wallpaper-host",
+        "url": "/",
+        "visible": false,
+        "decorations": false,
+        "skipTaskbar": true,
+        "focus": false,
+        "resizable": false,
+        "fullscreen": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$DOWNLOAD/**", "$HOME/**", "**"]
+      }
     }
   },
   "bundle": {

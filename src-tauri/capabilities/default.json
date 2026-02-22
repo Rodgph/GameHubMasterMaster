@@ -3,9 +3,13 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": [
-    "main"
+    "main",
+    "wallpaper_host"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-unlisten"
   ]
 }

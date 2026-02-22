@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { tauriEmit, tauriListen } from "../../core/platform/tauriEvents";
 import "./wallpaperHost.css";
 
@@ -13,98 +12,89 @@ type VideoEventPayload = {
   message?: string;
 };
 
-function toFileUrl(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  if (/^[a-zA-Z]:\//.test(normalized)) {
-    return encodeURI(`file:///${normalized}`);
-  }
-  if (normalized.startsWith("//")) {
-    return encodeURI(`file:${normalized}`);
-  }
-  if (normalized.startsWith("/")) {
-    return encodeURI(`file://${normalized}`);
-  }
-  return encodeURI(`file://${normalized}`);
-}
-
-function toPlayableSrc(path: string): string {
-  try {
-    return convertFileSrc(path);
-  } catch {
-    return toFileUrl(path);
-  }
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export function WallpaperHostPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    void invoke("motion_wallpaper_host_ready")
-      .then(() => {
-        console.info("[host] mounted/ready");
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setError(`HOST READY ERROR: ${message}`);
+    console.log("[host] mounted");
+    const unlisteners: Array<() => void> = [];
+
+    const setup = async () => {
+      const ul1 = await tauriListen<SetVideoPayload>("motion-wallpaper:set-video", async ({ path }) => {
+        const video = videoRef.current;
+        if (!video) {
+          console.error("[host] videoRef null on set-video");
+          return;
+        }
+
+        const normalizedPath = path.replace(/\\/g, "/");
+        const src = convertFileSrc(normalizedPath);
+        console.log("[host] set_video", { path: normalizedPath, src });
+
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+        await sleep(50);
+
+        video.src = src;
+        video.load();
+        try {
+          await video.play();
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error("[host] play error", msg);
+          void tauriEmit<VideoEventPayload>("motion_wallpaper:video_event", {
+            type: "error",
+            message: msg,
+          });
+        }
       });
+      unlisteners.push(ul1);
 
-    let unlistenSetVideo: (() => void) | null = null;
-    let unlistenSetVolume: (() => void) | null = null;
-    let unlistenPlay: (() => void) | null = null;
-    let unlistenPause: (() => void) | null = null;
-    let unlistenStop: (() => void) | null = null;
-    let unlistenPing: (() => void) | null = null;
-
-    void tauriListen<SetVideoPayload>("motion-wallpaper:set-video", ({ path }) => {
-      const el = videoRef.current;
-      if (!el) return;
-      setError("");
-      el.src = toPlayableSrc(path);
-      el.load();
-      console.info("[wallpaper-host] set-video", { path, src: el.src });
-      void el.play().catch((err) => {
-        const message = err instanceof Error ? err.message : "play failed";
-        setError(`VIDEO ERROR ${message}`);
-        void tauriEmit<VideoEventPayload>("motion_wallpaper:video_event", {
-          type: "error",
-          message,
-        });
+      const ul2 = await tauriListen<SetVolumePayload>("motion-wallpaper:set-volume", ({ volume }) => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.volume = Math.max(0, Math.min(1, volume / 100));
+        console.log("[host] set_volume", video.volume);
       });
-    }).then((u) => (unlistenSetVideo = u));
+      unlisteners.push(ul2);
 
-    void tauriListen<SetVolumePayload>("motion-wallpaper:set-volume", ({ volume }) => {
-      const el = videoRef.current;
-      if (!el) return;
-      el.volume = Math.max(0, Math.min(1, volume / 100));
-    }).then((u) => (unlistenSetVolume = u));
+      const ul3 = await tauriListen<void>("motion-wallpaper:play", () => {
+        console.log("[host] play");
+        void videoRef.current?.play();
+      });
+      unlisteners.push(ul3);
 
-    void tauriListen<void>("motion-wallpaper:play", () => {
-      void videoRef.current?.play();
-    }).then((u) => (unlistenPlay = u));
+      const ul4 = await tauriListen<void>("motion-wallpaper:pause", () => {
+        console.log("[host] pause");
+        videoRef.current?.pause();
+      });
+      unlisteners.push(ul4);
 
-    void tauriListen<void>("motion-wallpaper:pause", () => {
-      videoRef.current?.pause();
-    }).then((u) => (unlistenPause = u));
+      const ul5 = await tauriListen<void>("motion-wallpaper:stop", () => {
+        console.log("[host] stop");
+        const video = videoRef.current;
+        if (!video) return;
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      });
+      unlisteners.push(ul5);
 
-    void tauriListen<void>("motion-wallpaper:stop", () => {
-      const el = videoRef.current;
-      if (!el) return;
-      el.pause();
-      el.currentTime = 0;
-    }).then((u) => (unlistenStop = u));
+      await invoke("motion_wallpaper_host_ready");
+      console.log("[host] ready signaled");
+    };
 
-    void tauriListen<void>("motion-wallpaper:ping", () => {
-      void tauriEmit("motion_wallpaper:pong", { ts: Date.now() });
-    }).then((u) => (unlistenPing = u));
+    void setup();
 
     return () => {
-      unlistenSetVideo?.();
-      unlistenSetVolume?.();
-      unlistenPlay?.();
-      unlistenPause?.();
-      unlistenStop?.();
-      unlistenPing?.();
+      for (const unlisten of unlisteners) {
+        unlisten();
+      }
     };
   }, []);
 
@@ -115,15 +105,21 @@ export function WallpaperHostPage() {
         className="wallpaper-host-video"
         autoPlay
         loop
+        muted
+        playsInline
         controls={false}
         preload="auto"
         onLoadedData={() => {
-          setError("");
+          console.log("[host] loadeddata");
           void tauriEmit<VideoEventPayload>("motion_wallpaper:video_event", {
             type: "loadeddata",
           });
         }}
+        onCanPlay={() => {
+          console.log("[host] canplay");
+        }}
         onPlaying={() => {
+          console.log("[host] playing");
           void tauriEmit<VideoEventPayload>("motion_wallpaper:video_event", {
             type: "playing",
           });
@@ -132,7 +128,7 @@ export function WallpaperHostPage() {
           const el = videoRef.current;
           const code = el?.error?.code;
           const message = code ? `code=${code}` : "unknown";
-          setError(`VIDEO ERROR ${message}`);
+          console.error("[host] error", message);
           void tauriEmit<VideoEventPayload>("motion_wallpaper:video_event", {
             type: "error",
             code,
@@ -140,8 +136,6 @@ export function WallpaperHostPage() {
           });
         }}
       />
-      <div className="wallpaper-host-ready">WALLPAPER HOST ATIVO</div>
-      {error ? <div className="wallpaper-host-error">{error}</div> : null}
     </main>
   );
 }

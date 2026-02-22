@@ -89,6 +89,8 @@ pub fn run() {
       motion_wallpaper::motion_wallpaper_set_video,
       motion_wallpaper::motion_wallpaper_set_volume,
       motion_wallpaper::motion_wallpaper_apply,
+      motion_wallpaper::motion_wallpaper_apply_ex,
+      motion_wallpaper::motion_wallpaper_get_monitors,
       motion_wallpaper::motion_wallpaper_stop,
       motion_wallpaper::motion_wallpaper_reload_host,
       motion_wallpaper::motion_wallpaper_host_ready,

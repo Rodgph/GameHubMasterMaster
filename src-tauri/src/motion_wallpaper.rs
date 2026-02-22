@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use url::Url;
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -24,7 +23,16 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
   SW_SHOWNOACTIVATE, WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
 };
 
+#[cfg(target_os = "windows")]
+use windows::Win32::Foundation::{BOOL, LPARAM as WLPARAM, RECT as FRECT};
+use windows::Win32::Graphics::Gdi::{
+  EnumDisplayMonitors, GetMonitorInfoW as GetMonitorInfoWWin, HDC as WHDC, HMONITOR as WHMONITOR,
+  MONITORINFO, MONITORINFOEXW as MONITORINFOEXW_WIN,
+};
+use windows::Win32::UI::WindowsAndMessaging::MONITORINFOF_PRIMARY;
+
 const HOST_LABEL: &str = "wallpaper_host";
+const HOST_HASH_ROUTE: &str = "/wallpaper-host";
 
 #[derive(Default)]
 pub struct MotionWallpaperRuntime {
@@ -131,17 +139,195 @@ pub fn register_event_listeners(app: &AppHandle) {
   });
 }
 
-fn derive_host_url(app: &AppHandle) -> Result<Url> {
-  let main = app
-    .get_webview_window("main")
-    .ok_or_else(|| "main window not found".to_string())?;
-  let mut host_url = main.url().map_err(|e| e.to_string())?;
-  host_url.set_fragment(Some("/wallpaper-host"));
-  Ok(host_url)
+#[cfg(target_os = "windows")]
+#[derive(Serialize)]
+pub struct MonitorDesc {
+  pub id: String,
+  pub name: String,
+  pub x: i32,
+  pub y: i32,
+  pub width: i32,
+  pub height: i32,
+  pub primary: bool,
 }
 
-fn ensure_host_window(app: &AppHandle, host_url: &Url) -> Result<WebviewWindow> {
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn monitor_enum_proc(
+  hmonitor: WHMONITOR,
+  _hdc: WHDC,
+  _lprc: *mut FRECT,
+  lparam: WLPARAM,
+) -> BOOL {
+  let vec_ptr = lparam.0 as *mut Vec<MonitorDesc>;
+  if vec_ptr.is_null() {
+    return BOOL(1);
+  }
+
+  let mut mi: MONITORINFOEXW_WIN = std::mem::zeroed();
+  mi.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW_WIN>() as u32;
+  if GetMonitorInfoWWin(hmonitor, &mut mi as *mut _ as *mut MONITORINFO).as_bool() {
+    let name = {
+      let slice = &mi.szDevice;
+      let mut len = 0usize;
+      while len < slice.len() && slice[len] != 0 {
+        len += 1;
+      }
+      String::from_utf16_lossy(&slice[..len])
+    };
+    let r = mi.monitorInfo.rcMonitor;
+    let width = (r.right - r.left).max(0);
+    let height = (r.bottom - r.top).max(0);
+    let primary = (mi.monitorInfo.dwFlags & MONITORINFOF_PRIMARY) != 0;
+    let id = format!("{}:{}:{}:{}", name, r.left, r.top, primary as u8);
+    let desc = MonitorDesc {
+      id,
+      name,
+      x: r.left,
+      y: r.top,
+      width,
+      height,
+      primary,
+    };
+    (*vec_ptr).push(desc);
+  }
+
+  BOOL(1)
+}
+
+#[cfg(target_os = "windows")]
+fn get_monitors_list() -> Result<Vec<MonitorDesc>> {
+  let mut out: Vec<MonitorDesc> = Vec::new();
+  unsafe {
+    let res = EnumDisplayMonitors(
+      None,
+      None,
+      Some(monitor_enum_proc),
+      WLPARAM(&mut out as *mut _ as isize),
+    );
+    if res.as_bool() {
+      out.sort_by(|a, b| {
+        if a.primary != b.primary {
+          return b.primary.cmp(&a.primary);
+        }
+        a.x.cmp(&b.x).then(a.y.cmp(&b.y))
+      });
+      Ok(out)
+    } else {
+      Err("EnumDisplayMonitors failed".to_string())
+    }
+  }
+}
+
+#[tauri::command]
+pub fn motion_wallpaper_get_monitors() -> Result<Vec<MonitorDesc>> {
+  #[cfg(target_os = "windows")]
+  {
+    get_monitors_list()
+  }
+  #[cfg(not(target_os = "windows"))]
+  {
+    Err("only supported on Windows".to_string())
+  }
+}
+
+#[tauri::command]
+pub fn motion_wallpaper_apply_ex(
+  app: AppHandle,
+  aspect: Option<String>,
+  monitor_id: Option<String>,
+) -> Result<()> {
+  // apply but allow aspect and monitor selection; reuse existing apply logic
+  let window = ensure_host_window(&app)?;
+
+  {
+    let runtime = app.state::<MotionWallpaperRuntime>();
+    let mut state = runtime
+      .state
+      .lock()
+      .map_err(|_| "state lock failed".to_string())?;
+    state.host_exists = true;
+  }
+
+  if !wait_for_host_ready(&app, 5000) {
+    let runtime = app.state::<MotionWallpaperRuntime>();
+    if let Ok(mut state) = runtime.state.lock() {
+      state.last_error = Some("Host nao carregou a rota /#/wallpaper-host".to_string());
+    }
+    return Err("Host nao carregou a rota /#/wallpaper-host".to_string());
+  }
+
+  #[cfg(target_os = "windows")]
+  {
+    let (attached, worker, parent, rect) = attach_to_workerw(&window)?;
+    if !attached {
+      let message = "Falha ao anexar no WorkerW".to_string();
+      if let Ok(mut state) = app.state::<MotionWallpaperRuntime>().state.lock() {
+        state.last_error = Some(message.clone());
+        state.attached = false;
+        state.workerw = worker;
+        state.parent_hwnd = parent;
+        state.last_rect = rect;
+      }
+      return Err(message);
+    }
+
+    let click_through = {
+      let runtime = app.state::<MotionWallpaperRuntime>();
+      let state = runtime
+        .state
+        .lock()
+        .map_err(|_| "state lock failed".to_string())?;
+      state.click_through
+    };
+    let _ = set_click_through(&window, click_through);
+
+    // compute target rect based on requested aspect and monitor selection
+    let fallback = virtual_bounds();
+    let selected = match get_monitors_list() {
+      Ok(list) => {
+        if let Some(id) = monitor_id.clone() {
+          list.into_iter().find(|m| m.id == id)
+        } else {
+          None
+        }
+      }
+      Err(_) => None,
+    };
+    let (vx, vy, vw, vh) = selected
+      .map(|m| (m.x, m.y, m.width, m.height))
+      .unwrap_or(fallback);
+    let r = compute_aspect_rect(vx, vy, vw, vh, aspect.as_deref().unwrap_or("fill"));
+
+    {
+      let runtime = app.state::<MotionWallpaperRuntime>();
+      let mut state = runtime
+        .state
+        .lock()
+        .map_err(|_| "state lock failed".to_string())?;
+      state.running = true;
+      state.attached = true;
+      state.monitors = monitor_count();
+      state.workerw = worker;
+      state.parent_hwnd = parent;
+      state.last_rect = r.clone();
+      state.last_error = None;
+    }
+
+    unsafe {
+      if let Ok(hwnd) = hwnd_from_window(&window) {
+        let _ = SetWindowPos(hwnd, std::ptr::null_mut(), r.x, r.y, r.w.max(1), r.h.max(1), 0x0040 /* SWP_NOZORDER */ | 0x0004 /* SWP_NOACTIVATE */);
+        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE as i32);
+      }
+    }
+  }
+
+  emit_host_event(&app, "motion-wallpaper:play", ());
+  Ok(())
+}
+
+fn ensure_host_window(app: &AppHandle) -> Result<WebviewWindow> {
   if let Some(win) = app.get_webview_window(HOST_LABEL) {
+    let _ = win.eval(&format!("window.location.hash = '{}';", HOST_HASH_ROUTE));
     let _ = win.hide();
     return Ok(win);
   }
@@ -149,7 +335,7 @@ fn ensure_host_window(app: &AppHandle, host_url: &Url) -> Result<WebviewWindow> 
   let build_result = WebviewWindowBuilder::new(
     app,
     HOST_LABEL,
-    WebviewUrl::External(host_url.clone()),
+    WebviewUrl::App("/".into()),
   )
   .decorations(false)
   .transparent(false)
@@ -175,6 +361,7 @@ fn ensure_host_window(app: &AppHandle, host_url: &Url) -> Result<WebviewWindow> 
   {
     apply_toolwindow_style(&window)?;
   }
+  let _ = window.eval(&format!("window.location.hash = '{}';", HOST_HASH_ROUTE));
 
   Ok(window)
 }
@@ -381,6 +568,44 @@ fn wait_for_host_ready(app: &AppHandle, timeout_ms: u64) -> bool {
   false
 }
 
+#[cfg(target_os = "windows")]
+fn compute_aspect_rect(x: i32, y: i32, w: i32, h: i32, aspect: &str) -> RectDebug {
+  let mw = w.max(1);
+  let mh = h.max(1);
+  if aspect.eq_ignore_ascii_case("fill") {
+    return RectDebug { x, y, w: mw, h: mh };
+  }
+
+  let target_ratio = if aspect == "9:16" {
+    9.0f64 / 16.0f64
+  } else {
+    16.0f64 / 9.0f64
+  };
+  let mwf = mw as f64;
+  let mhf = mh as f64;
+  let monitor_ratio = mwf / mhf;
+
+  if monitor_ratio > target_ratio {
+    let th = mhf;
+    let tw = (th * target_ratio).round();
+    RectDebug {
+      x: x + ((mwf - tw) / 2.0).round() as i32,
+      y,
+      w: tw as i32,
+      h: th as i32,
+    }
+  } else {
+    let tw = mwf;
+    let th = (tw / target_ratio).round();
+    RectDebug {
+      x,
+      y: y + ((mhf - th) / 2.0).round() as i32,
+      w: tw as i32,
+      h: th as i32,
+    }
+  }
+}
+
 fn spawn_watcher_once(app: AppHandle) {
   let runtime = app.state::<MotionWallpaperRuntime>();
   if runtime.watcher_running.swap(true, Ordering::SeqCst) {
@@ -473,18 +698,17 @@ pub fn motion_wallpaper_start(app: AppHandle) -> Result<()> {
     let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   }
 
-  let host_url = derive_host_url(&app)?;
-  let host_url_str = host_url.to_string();
+  let host_url_str = format!("/#{}", HOST_HASH_ROUTE);
 
   let window = if let Some(existing) = app.get_webview_window(HOST_LABEL) {
-    if let Err(err) = existing.navigate(host_url.clone()) {
+    if let Err(err) = existing.eval(&format!("window.location.hash = '{}';", HOST_HASH_ROUTE)) {
       if let Ok(mut state) = app.state::<MotionWallpaperRuntime>().state.lock() {
         state.last_error = Some(format!("Falha ao navegar host: {err}"));
       }
     }
     existing
   } else {
-    ensure_host_window(&app, &host_url)?
+    ensure_host_window(&app)?
   };
 
   #[cfg(target_os = "windows")]
@@ -526,8 +750,7 @@ pub fn motion_wallpaper_set_video(app: AppHandle, path: String) -> Result<()> {
     state.last_error = None;
   }
 
-  let host_url = derive_host_url(&app)?;
-  let _ = ensure_host_window(&app, &host_url)?;
+  let _ = ensure_host_window(&app)?;
   emit_host_event(
     &app,
     "motion-wallpaper:set-video",
@@ -558,8 +781,7 @@ pub fn motion_wallpaper_set_volume(app: AppHandle, volume: u8) -> Result<()> {
 
 #[tauri::command]
 pub fn motion_wallpaper_apply(app: AppHandle) -> Result<()> {
-  let host_url = derive_host_url(&app)?;
-  let window = ensure_host_window(&app, &host_url)?;
+  let window = ensure_host_window(&app)?;
 
   {
     let runtime = app.state::<MotionWallpaperRuntime>();
@@ -660,9 +882,8 @@ pub fn motion_wallpaper_reload_host(app: AppHandle) -> Result<()> {
     let _ = win.close();
   }
 
-  let host_url = derive_host_url(&app)?;
-  let host_url_str = host_url.to_string();
-  let _ = ensure_host_window(&app, &host_url)?;
+  let host_url_str = format!("/#{}", HOST_HASH_ROUTE);
+  let _ = ensure_host_window(&app)?;
 
   {
     let runtime = app.state::<MotionWallpaperRuntime>();

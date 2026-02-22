@@ -17,7 +17,7 @@ export type MotionWallpaperStatus = {
 
 export type MotionWallpaperDebugState = {
   hostReady: boolean;
-  lastHostReadyAt: number | null;
+  hostReadyAt: number | null;
   lastVideoEvent: string | null;
   attached: boolean;
   parentHwnd: number;
@@ -66,4 +66,14 @@ export async function motionWallpaperReloadHost() {
 
 export async function motionWallpaperDebugState() {
   return invoke<MotionWallpaperDebugState>("motion_wallpaper_debug_state");
+}
+
+export async function motionWallpaperGetMonitors() {
+  return invoke<Array<{ id: string; name: string; x: number; y: number; width: number; height: number; primary: boolean }>>(
+    "motion_wallpaper_get_monitors",
+  );
+}
+
+export async function motionWallpaperApplyWithOptions(aspect?: "16:9" | "9:16" | "fill", monitorId?: string) {
+  return invoke<void>("motion_wallpaper_apply_ex", { aspect, monitorId, monitor_id: monitorId });
 }
