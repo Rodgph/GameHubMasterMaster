@@ -63,6 +63,8 @@ export function MotionWallpaperModule() {
     hostReadyAt: null,
     lastError: null,
     hostUrl: null,
+    parentHwnd: 0,
+    hostRect: { x: 0, y: 0, w: 0, h: 0 },
     state: "parado",
   });
   const [debugState, setDebugState] = useState<MotionWallpaperDebugState>(EMPTY_DEBUG);
@@ -279,22 +281,23 @@ export function MotionWallpaperModule() {
 
       <div className="module-item">
         <strong>Debug</strong>
-        <span>Host: {debugState.hostReady ? "pronto" : "nao pronto"}</span>
-        <span>HostExists: {debugState.hostExists ? "sim" : "nao"}</span>
-        <span>HostReadyAt: {formatTs(debugState.lastHostReadyAt)}</span>
+        <span>Host: {status.hostReady ? "pronto" : "nao pronto"}</span>
+        <span>HostExists: {status.hostExists ? "sim" : "nao"}</span>
+        <span>HostReadyAt: {formatTs(status.hostReadyAt)}</span>
         <span>VideoEvent: {debugState.lastVideoEvent ?? "-"}</span>
-        <span>Attached: {debugState.attached ? "sim" : "nao"}</span>
+        <span>Attached: {status.attached ? "sim" : "nao"}</span>
         <span>
-          Rect: {debugState.hostRect.x},{debugState.hostRect.y},{debugState.hostRect.w},{debugState.hostRect.h}
+          Rect: {status.hostRect.x},{status.hostRect.y},{status.hostRect.w},{status.hostRect.h}
         </span>
-        <span>Parent HWND: {debugState.parentHwnd}</span>
+        <span>Parent HWND: {status.parentHwnd}</span>
         <span>Windows: {debugState.windows.join(", ") || "-"}</span>
-        <span>Ultimo erro: {debugState.lastError ?? "-"}</span>
+        <span>Host URL: {status.hostUrl ?? "-"}</span>
+        <span>Ultimo erro: {status.lastError ?? debugState.lastError ?? "-"}</span>
       </div>
 
       {!isTauri ? <p>Disponivel apenas no desktop (Tauri/Windows).</p> : null}
       {pickError ? <p>{pickError}</p> : null}
-      {actionError ? <p>{actionError}</p> : null}
+      {actionError ? <p className="motion-wallpaper-error">{actionError}</p> : null}
     </section>
   );
 }

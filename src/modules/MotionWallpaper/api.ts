@@ -11,6 +11,8 @@ export type MotionWallpaperStatus = {
   hostReadyAt: number | null;
   lastError: string | null;
   hostUrl: string | null;
+  parentHwnd: number;
+  hostRect: { x: number; y: number; w: number; h: number };
 };
 
 export type MotionWallpaperDebugState = {

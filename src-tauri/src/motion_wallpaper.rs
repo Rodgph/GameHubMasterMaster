@@ -9,7 +9,7 @@ use url::Url;
 type Result<T> = std::result::Result<T, String>;
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
+use windows_sys::Win32::Foundation::{GetLastError, SetLastError, HWND, LPARAM, RECT, WPARAM};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::HiDpi::{
   SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
@@ -73,6 +73,8 @@ pub struct MotionWallpaperStatus {
   host_ready_at: Option<i64>,
   last_error: Option<String>,
   host_url: Option<String>,
+  parent_hwnd: isize,
+  host_rect: RectDebug,
 }
 
 #[derive(Serialize)]
@@ -140,6 +142,7 @@ fn derive_host_url(app: &AppHandle) -> Result<Url> {
 
 fn ensure_host_window(app: &AppHandle, host_url: &Url) -> Result<WebviewWindow> {
   if let Some(win) = app.get_webview_window(HOST_LABEL) {
+    let _ = win.hide();
     return Ok(win);
   }
 
@@ -344,18 +347,19 @@ fn attach_to_workerw(window: &WebviewWindow) -> Result<(bool, isize, isize, Rect
   };
 
   unsafe {
-    let _ = SetParent(hwnd, workerw);
+    SetLastError(0);
+    let previous_parent = SetParent(hwnd, workerw);
+    if previous_parent.is_null() && GetLastError() != 0 {
+      return Ok((false, workerw as isize, 0, RectDebug::default()));
+    }
   }
 
   layout_host(window)?;
 
-  unsafe {
-    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-  }
-
   let parent = unsafe { GetParent(hwnd) } as isize;
   let rect = get_hwnd_rect(hwnd);
-  Ok((true, workerw as isize, parent, rect))
+  let attached = parent == workerw as isize && rect.w > 0 && rect.h > 0;
+  Ok((attached, workerw as isize, parent, rect))
 }
 
 fn emit_host_event<T: serde::Serialize + Clone>(app: &AppHandle, event: &str, payload: T) {
@@ -411,12 +415,27 @@ fn spawn_watcher_once(app: AppHandle) {
       };
 
       if should_reattach {
+        println!("[motion_wallpaper] reattach start");
         if let Ok((attached, worker, parent, rect)) = attach_to_workerw(&win) {
           if let Ok(mut state) = app.state::<MotionWallpaperRuntime>().state.lock() {
             state.attached = attached;
             state.workerw = worker;
             state.parent_hwnd = parent;
             state.last_rect = rect;
+            state.monitors = monitor_count();
+            if !attached {
+              state.last_error = Some("Falha ao reanexar no WorkerW".to_string());
+            }
+          }
+          if attached {
+            println!("[motion_wallpaper] reattach ok");
+          }
+        }
+      } else if let Ok(mut state) = app.state::<MotionWallpaperRuntime>().state.lock() {
+        if state.attached {
+          let _ = layout_host(&win);
+          if let Ok(hwnd) = hwnd_from_window(&win) {
+            state.last_rect = get_hwnd_rect(hwnd);
             state.monitors = monitor_count();
           }
         }
@@ -443,10 +462,6 @@ pub fn motion_wallpaper_host_ready(app: AppHandle) -> Result<()> {
   state.host_ready = true;
   state.host_ready_at = Some(now_ms());
   state.last_error = None;
-
-  if let Some(win) = app.get_webview_window(HOST_LABEL) {
-    let _ = win.show();
-  }
 
   Ok(())
 }
@@ -483,7 +498,7 @@ pub fn motion_wallpaper_start(app: AppHandle) -> Result<()> {
       .state
       .lock()
       .map_err(|_| "state lock failed".to_string())?;
-    state.running = true;
+    state.running = false;
     state.attached = false;
     state.host_ready = false;
     state.host_exists = true;
@@ -566,14 +581,12 @@ pub fn motion_wallpaper_apply(app: AppHandle) -> Result<()> {
   #[cfg(target_os = "windows")]
   {
     let (attached, worker, parent, rect) = attach_to_workerw(&window)?;
-    if !attached || rect.w <= 0 || rect.h <= 0 {
-      let message = format!(
-        "Attach/layout falhou: attached={} rect=({}, {}, {}, {})",
-        attached, rect.x, rect.y, rect.w, rect.h
-      );
+    if !attached {
+      let message = "Falha ao anexar no WorkerW".to_string();
       if let Ok(mut state) = app.state::<MotionWallpaperRuntime>().state.lock() {
         state.last_error = Some(message.clone());
         state.attached = false;
+        state.workerw = worker;
         state.parent_hwnd = parent;
         state.last_rect = rect;
       }
@@ -603,6 +616,11 @@ pub fn motion_wallpaper_apply(app: AppHandle) -> Result<()> {
       state.parent_hwnd = parent;
       state.last_rect = rect;
       state.last_error = None;
+    }
+
+    unsafe {
+      let hwnd = hwnd_from_window(&window)?;
+      let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
   }
 
@@ -663,6 +681,15 @@ pub fn motion_wallpaper_reload_host(app: AppHandle) -> Result<()> {
     state.host_url = Some(host_url_str);
   }
 
+  if !wait_for_host_ready(&app, 1500) {
+    let runtime = app.state::<MotionWallpaperRuntime>();
+    let mut state = runtime
+      .state
+      .lock()
+      .map_err(|_| "state lock failed".to_string())?;
+    state.last_error = Some("Host nao carregou a rota /#/wallpaper-host".to_string());
+  }
+
   Ok(())
 }
 
@@ -674,17 +701,21 @@ pub fn motion_wallpaper_status(app: AppHandle) -> Result<MotionWallpaperStatus> 
     .lock()
     .map_err(|_| "state lock failed".to_string())?;
 
+  let host_exists = app.get_webview_window(HOST_LABEL).is_some() || state.host_exists;
+
   Ok(MotionWallpaperStatus {
     running: state.running,
     attached: state.attached,
     monitors: if state.monitors <= 0 { 1 } else { state.monitors },
     video_path: state.video_path.clone(),
     click_through: state.click_through,
-    host_exists: state.host_exists,
+    host_exists,
     host_ready: state.host_ready,
     host_ready_at: state.host_ready_at,
     last_error: state.last_error.clone(),
     host_url: state.host_url.clone(),
+    parent_hwnd: state.parent_hwnd,
+    host_rect: state.last_rect.clone(),
   })
 }
 

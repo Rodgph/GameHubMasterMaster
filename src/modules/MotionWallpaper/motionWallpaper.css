@@ -14,3 +14,8 @@
 .motion-wallpaper .motion-row {
   justify-content: space-between;
 }
+
+.motion-wallpaper-error {
+  color: #ff6b6b;
+  font-weight: 600;
+}
