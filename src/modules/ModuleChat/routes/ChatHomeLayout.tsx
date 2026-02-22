@@ -3,7 +3,10 @@ import { FiBell, FiBellOff, FiMail, FiStar, FiTrash2 } from "react-icons/fi";
 import { RiUserFollowLine, RiUserUnfollowLine } from "react-icons/ri";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
+import { cloudRealtimeWsUrl } from "../../../core/services/cloudflareApi";
+import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { useChatStore } from "../chatStore";
 import { CreateGroupOverlay, FloatingCreateMenu, ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
 import { getOrCreateDMRoom } from "../data/dm.repository";
 import { followUser, unfollowUser } from "../data/follows.repository";
@@ -28,6 +31,9 @@ export function ChatHomeLayout() {
   const logout = useSessionStore((state) => state.logout);
   const currentUser = useSessionStore((state) => state.user);
   const currentUserId = useSessionStore((state) => state.user?.id ?? null);
+  const rooms = useChatStore((state) => state.rooms);
+  const messagesByRoomId = useChatStore((state) => state.messagesByRoomId);
+  const loadRooms = useChatStore((state) => state.loadRooms);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [openConversations, setOpenConversations] = useState(getOpenConversations);
@@ -41,6 +47,164 @@ export function ChatHomeLayout() {
   const { profiles: followedProfiles, refresh: refreshFollowedProfiles } = useFollowedProfiles();
   const [storyUserIds, setStoryUserIds] = useState<Set<string>>(new Set());
   const followedIds = useMemo(() => new Set(followedProfiles.map((item) => item.id)), [followedProfiles]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    void loadRooms();
+
+    const refreshRooms = () => {
+      void loadRooms();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshRooms();
+      }
+    };
+
+    window.addEventListener("focus", refreshRooms);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refreshRooms);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [currentUserId, loadRooms]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    void loadRooms();
+  }, [currentUserId, loadRooms, messagesByRoomId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let active = true;
+    let ws: WebSocket | null = null;
+    let refreshTimer: number | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer !== null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void loadRooms(true);
+      }, 250);
+    };
+
+    const connect = async () => {
+      const supabase = getSupabaseClient();
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token || !active) return;
+
+      ws = new WebSocket(cloudRealtimeWsUrl(token));
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(String(event.data)) as {
+            type?: string;
+            payload?: { roomId?: string; senderId?: string };
+          };
+          if (parsed.type === "room_updated") {
+            scheduleRefresh();
+          }
+        } catch {
+          // ignore malformed payload
+        }
+      };
+    };
+
+    void connect();
+    return () => {
+      active = false;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      ws?.close();
+    };
+  }, [currentUserId, loadRooms]);
+
+  useEffect(() => {
+    if (!currentUserId || rooms.length === 0) return;
+
+    const parsePeerIdFromDmTitle = (title: string) => {
+      if (!title.startsWith("dm:")) return null;
+      const [, a, b] = title.split(":");
+      if (!a || !b) return null;
+      if (a === currentUserId) return b;
+      if (b === currentUserId) return a;
+      return null;
+    };
+
+    const dmEntries = rooms
+      .map((room) => {
+        const title = room.title ?? "";
+        const peerId = parsePeerIdFromDmTitle(title);
+        if (!peerId) return null;
+        return { roomId: room.roomId, peerId, lastMessageAt: room.lastMessageAt };
+      })
+      .filter((item): item is { roomId: string; peerId: string; lastMessageAt: string | null } => item !== null);
+
+    if (dmEntries.length === 0) return;
+
+    let active = true;
+    const run = async () => {
+      const supabase = getSupabaseClient();
+      const peerIds = [...new Set(dmEntries.map((item) => item.peerId))];
+      const profilesResult = await supabase
+        .from("chat_profiles")
+        .select("id, username, avatar_url")
+        .in("id", peerIds);
+
+      if (!active) return;
+      if (profilesResult.error) return;
+
+      const profiles = (profilesResult.data ?? []) as Array<{
+        id: string;
+        username: string;
+        avatar_url: string | null;
+      }>;
+      const profileById = new Map(profiles.map((profile) => [profile.id, profile] as const));
+
+      let changed = false;
+      for (const entry of dmEntries) {
+        const profile = profileById.get(entry.peerId);
+        if (!profile) continue;
+
+        const current = getOpenConversations().find((item) => item.userId === entry.peerId);
+        const roomMessages = messagesByRoomId[entry.roomId] ?? [];
+        const latestMessage = roomMessages.length > 0 ? roomMessages[roomMessages.length - 1] : undefined;
+        const nextPreview =
+          latestMessage && !latestMessage.deletedAt
+            ? latestMessage.body
+            : current?.lastMessagePreview || "Toque para abrir a conversa";
+
+        const next = addOpenConversation({
+          userId: entry.peerId,
+          type: "dm",
+          roomId: entry.roomId,
+          username: profile.username,
+          avatarUrl: profile.avatar_url ?? undefined,
+          lastOpenedAt: entry.lastMessageAt || current?.lastOpenedAt || new Date().toISOString(),
+          pinned: current?.pinned,
+          muted: current?.muted,
+          unreadCount: current?.unreadCount,
+          lastMessagePreview: nextPreview,
+        });
+
+        if (!current || current.roomId !== entry.roomId || current.lastMessagePreview !== nextPreview) {
+          changed = true;
+          setOpenConversations(next);
+        }
+      }
+
+      if (changed) {
+        setOpenConversations(getOpenConversations());
+      }
+    };
+
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [currentUserId, messagesByRoomId, rooms]);
   useEffect(() => {
     let active = true;
     const run = async () => {
@@ -112,6 +276,7 @@ export function ChatHomeLayout() {
         })
         .map((conversation) => ({
           userId: conversation.userId,
+          roomId: conversation.roomId,
           username: conversation.username,
           avatarUrl: conversation.avatarUrl,
           lastMessage: conversation.lastMessagePreview || "Toque para abrir a conversa",
@@ -129,6 +294,8 @@ export function ChatHomeLayout() {
     });
     const conversation = {
       userId: user.id,
+      type: "dm" as const,
+      roomId: dm.roomId,
       username: user.username,
       avatarUrl: user.avatar_url ?? undefined,
       lastOpenedAt: new Date().toISOString(),
@@ -305,6 +472,7 @@ export function ChatHomeLayout() {
       <div className="chat-home-layout-content" data-no-drag="true">
         <ChatHomeRoute
           items={chatItems}
+          currentUserId={currentUserId}
           onOpenUserId={(userId) => {
             const open = async () => {
               if (!currentUserId) return;
@@ -317,6 +485,17 @@ export function ChatHomeLayout() {
                     type: "group",
                     groupName: target.username,
                     avatarUrl: target.avatarUrl,
+                  },
+                });
+                return;
+              }
+              if (target?.type === "dm" && target.roomId) {
+                navigate(`/chat/conversation/${target.roomId}`, {
+                  state: {
+                    type: "dm",
+                    peerId: userId,
+                    username: target?.username ?? "Conversa",
+                    avatarUrl: target?.avatarUrl,
                   },
                 });
                 return;

@@ -1,0 +1,30 @@
+.wallpaper-host-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #c00;
+}
+
+.wallpaper-host-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wallpaper-host-error {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.wallpaper-host-ready {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}

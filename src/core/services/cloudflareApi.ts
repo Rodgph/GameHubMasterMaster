@@ -1,5 +1,3 @@
-import type { ModuleId } from "../modules/types";
-
 function getApiBaseOrThrow() {
   const value = import.meta.env.VITE_API_BASE_URL as string | undefined;
   if (!value) {
@@ -15,7 +13,11 @@ export type CloudUser = {
   avatar_url: string | null;
 };
 
-export type ModulesEnabledMap = Record<Exclude<ModuleId, "welcome">, boolean>;
+export type ModulesEnabledMap = {
+  chat: boolean;
+  feed: boolean;
+  music: boolean;
+};
 export type ChatRoom = {
   roomId: string;
   title: string | null;

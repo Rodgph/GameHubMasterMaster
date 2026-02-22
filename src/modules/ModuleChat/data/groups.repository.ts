@@ -215,3 +215,68 @@ export async function createGroupRoom(params: {
 
   return { roomId: createdRoom.roomId, status: "created" as const };
 }
+
+export async function addMember(roomId: string, userId: string) {
+  const supabase = getSupabaseClient();
+  const group = await supabase.from("chat_groups").select("id").eq("room_id", roomId).single();
+  if (group.error || !group.data) throw new Error(group.error?.message || "Grupo não encontrado.");
+
+  const insert = await supabase.from("chat_group_members").upsert(
+    {
+      group_id: group.data.id,
+      user_id: userId,
+      role: "member",
+    },
+    { onConflict: "group_id,user_id" },
+  );
+  if (insert.error) throw new Error(insert.error.message || "Falha ao adicionar membro.");
+}
+
+export async function removeMember(roomId: string, userId: string) {
+  const supabase = getSupabaseClient();
+  const group = await supabase.from("chat_groups").select("id").eq("room_id", roomId).single();
+  if (group.error || !group.data) throw new Error(group.error?.message || "Grupo não encontrado.");
+
+  const del = await supabase
+    .from("chat_group_members")
+    .delete()
+    .eq("group_id", group.data.id)
+    .eq("user_id", userId);
+  if (del.error) throw new Error(del.error.message || "Falha ao remover membro.");
+}
+
+export async function updateGroup(
+  roomId: string,
+  payload: { name?: string; description?: string; imageFile?: File | null; ownerId: string },
+) {
+  const supabase = getSupabaseClient();
+  const group = await supabase
+    .from("chat_groups")
+    .select("id, owner_id")
+    .eq("room_id", roomId)
+    .single();
+  if (group.error || !group.data) throw new Error(group.error?.message || "Grupo não encontrado.");
+  if (group.data.owner_id !== payload.ownerId) throw new Error("Somente o dono pode atualizar o grupo.");
+
+  const updateData: { name?: string; description?: string | null; image_path?: string } = {};
+  if (payload.name !== undefined) updateData.name = payload.name.trim();
+  if (payload.description !== undefined) updateData.description = payload.description || null;
+
+  if (payload.imageFile) {
+    const ext = extFromFile(payload.imageFile);
+    const imagePath = `${payload.ownerId}/${group.data.id}/avatar-${Date.now()}.${ext}`;
+    const upload = await supabase.storage.from(GROUP_BUCKET).upload(imagePath, payload.imageFile, {
+      upsert: false,
+      contentType: payload.imageFile.type || undefined,
+    });
+    if (upload.error) throw new Error(upload.error.message || "Falha ao enviar imagem.");
+    updateData.image_path = imagePath;
+  }
+
+  const update = await supabase.from("chat_groups").update(updateData).eq("id", group.data.id);
+  if (update.error) throw new Error(update.error.message || "Falha ao atualizar grupo.");
+}
+
+export async function leaveGroup(roomId: string, userId: string) {
+  await removeMember(roomId, userId);
+}

@@ -250,6 +250,8 @@
 }
 
 .workspace-menu-item {
+  position: relative;
+  overflow: hidden;
   font-size: 14px;
   border-radius: 6px;
   padding: 8px 10px;
@@ -260,6 +262,17 @@
 
 .workspace-menu-item[data-highlighted] {
   background: var(--bg-surface);
+}
+
+.workspace-menu-item[data-state="open"] {
+  background: var(--bg-surface);
+}
+
+.workspace-menu-label {
+  display: block;
+  padding: 8px 10px 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .workspace-menu-separator {

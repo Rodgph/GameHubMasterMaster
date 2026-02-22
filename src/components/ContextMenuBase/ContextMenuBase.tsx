@@ -9,12 +9,13 @@ type AnchorPoint = {
 
 export type ContextMenuBaseItem = {
   id: string;
-  label: string;
+  label?: string;
   icon?: ReactNode;
+  content?: ReactNode;
   danger?: boolean;
   disabled?: boolean;
   secondary?: boolean;
-  kind?: "item" | "divider";
+  kind?: "item" | "divider" | "custom";
   onClick?: () => void;
 };
 
@@ -158,6 +159,10 @@ export function ContextMenuBase({
               key={item.id}
               className={`context-menu-base-divider${dividerClassName ? ` ${dividerClassName}` : ""}`}
             />
+          ) : item.kind === "custom" ? (
+            <div key={item.id} className="context-menu-base-custom">
+              {item.content}
+            </div>
           ) : (
             <button
               key={item.id}
@@ -180,7 +185,7 @@ export function ContextMenuBase({
               <span
                 className={`context-menu-base-item-label${labelClassName ? ` ${labelClassName}` : ""}`}
               >
-                {item.label}
+                {item.label ?? ""}
               </span>
             </button>
           ),

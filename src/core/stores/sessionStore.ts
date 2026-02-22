@@ -90,6 +90,7 @@ function baseModulesMap(): Record<ModuleId, boolean> {
     chat: false,
     feed: false,
     music: false,
+    motion_wallpaper: false,
     welcome: false,
   };
 }
@@ -100,6 +101,7 @@ function mergeModulesMap(cloudMap: ModulesEnabledMap): Record<ModuleId, boolean>
     chat: Boolean(cloudMap.chat),
     feed: Boolean(cloudMap.feed),
     music: Boolean(cloudMap.music),
+    motion_wallpaper: false,
     welcome: false,
   };
 }

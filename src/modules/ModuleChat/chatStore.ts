@@ -22,7 +22,7 @@ type ChatStore = {
   loadingRooms: boolean;
   loadingMessages: boolean;
   error: string | null;
-  loadRooms: () => Promise<void>;
+  loadRooms: (force?: boolean) => Promise<void>;
   createRoom: (title?: string) => Promise<void>;
   openRoom: (roomId: string) => Promise<void>;
   sendMessage: (body: string) => Promise<void>;
@@ -35,6 +35,9 @@ let activeRoomSocketId: string | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 6;
+const LOAD_ROOMS_COOLDOWN_MS = 1500;
+let loadRoomsInFlight: Promise<void> | null = null;
+let lastLoadRoomsAt = 0;
 
 async function getAccessToken() {
   const supabase = getSupabaseClient();
@@ -180,18 +183,35 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   loadingRooms: false,
   loadingMessages: false,
   error: null,
-  loadRooms: async () => {
-    set({ loadingRooms: true, error: null });
-    try {
-      const token = await getAccessToken();
-      const response = await cloudChatListRooms(token);
-      set({ rooms: response.rooms, loadingRooms: false });
-    } catch (error) {
-      set({
-        loadingRooms: false,
-        error: error instanceof Error ? error.message : "Falha ao carregar salas.",
-      });
+  loadRooms: async (force = false) => {
+    const now = Date.now();
+    if (!force && loadRoomsInFlight) {
+      await loadRoomsInFlight;
+      return;
     }
+    if (!force && now - lastLoadRoomsAt < LOAD_ROOMS_COOLDOWN_MS) {
+      return;
+    }
+
+    set({ loadingRooms: true, error: null });
+    const request = (async () => {
+      try {
+        const token = await getAccessToken();
+        const response = await cloudChatListRooms(token);
+        lastLoadRoomsAt = Date.now();
+        set({ rooms: response.rooms, loadingRooms: false });
+      } catch (error) {
+        set({
+          loadingRooms: false,
+          error: error instanceof Error ? error.message : "Falha ao carregar salas.",
+        });
+      } finally {
+        loadRoomsInFlight = null;
+      }
+    })();
+
+    loadRoomsInFlight = request;
+    await request;
   },
   createRoom: async (title) => {
     try {

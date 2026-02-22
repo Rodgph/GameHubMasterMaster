@@ -6,3 +6,4 @@ export * from "./ChatProfileRoute";
 export * from "./ChatStoryRoute";
 export * from "./ChatConversationRoute";
 export * from "./ChatSettingsRoute";
+export * from "./ChatFavoritesRoute";

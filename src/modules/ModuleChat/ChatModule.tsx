@@ -7,6 +7,7 @@ import {
   ChatAccountRoute,
   ChatConversationRoute,
   ChatCreateServerRoute,
+  ChatFavoritesRoute,
   ChatHomeLayout,
   ChatProfileRoute,
   ChatSettingsRoute,
@@ -95,11 +96,7 @@ export function ChatModule() {
       return <ChatConversationRoute />;
     }
     if (isFavsRoute) {
-      return (
-        <div className="chat-route-placeholder" data-no-drag="true">
-          Favorites
-        </div>
-      );
+      return <ChatFavoritesRoute />;
     }
     if (isAccountRoute) {
       return <ChatAccountRoute />;

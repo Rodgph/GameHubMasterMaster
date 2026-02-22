@@ -75,6 +75,7 @@ export function Workspace() {
   const sessionReady = useSessionStore((state) => state.sessionReady);
   const user = useSessionStore((state) => state.user);
   const modulesEnabled = useSessionStore((state) => state.modulesEnabled);
+  const setModuleEnabled = useSessionStore((state) => state.setModuleEnabled);
   const firstRun = useSessionStore((state) => state.firstRun);
   const canvasRef = useRef<HTMLElement | null>(null);
   const snapRef = useRef<SnapState>(null);
@@ -95,12 +96,9 @@ export function Workspace() {
     () => widgets.find((widget) => widget.mode === "dock")?.id,
     [widgets],
   );
-  const enabledModulesList = useMemo(
-    () =>
-      moduleRegistry.filter(
-        (module) => module.id !== "welcome" && Boolean(modulesEnabled[module.id as ModuleId]),
-      ),
-    [modulesEnabled],
+  const addableModulesList = useMemo(
+    () => moduleRegistry.filter((module) => module.id !== "welcome"),
+    [],
   );
 
   useEffect(() => {
@@ -562,24 +560,24 @@ export function Workspace() {
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content className="workspace-menu">
-          <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="workspace-menu-item">
-              Adicionar modulo
-            </ContextMenu.SubTrigger>
-            <ContextMenu.Portal>
-              <ContextMenu.SubContent className="workspace-menu">
-                {enabledModulesList.map((module) => (
-                  <ContextMenu.Item
-                    key={module.id}
-                    className="workspace-menu-item"
-                    onSelect={() => addWidget(module.id)}
-                  >
-                    {module.title}
-                  </ContextMenu.Item>
-                ))}
-              </ContextMenu.SubContent>
-            </ContextMenu.Portal>
-          </ContextMenu.Sub>
+          <ContextMenu.Label className="workspace-menu-label">Adicionar modulo</ContextMenu.Label>
+          {addableModulesList.map((module) => (
+            <ContextMenu.Item
+              key={module.id}
+              className="workspace-menu-item"
+              onSelect={() => {
+                const moduleId = module.id as ModuleId;
+                if (!modulesEnabled[moduleId]) {
+                  setModuleEnabled(moduleId, true);
+                  ensureModuleDocked(moduleId);
+                  return;
+                }
+                addWidget(moduleId);
+              }}
+            >
+              {module.title}
+            </ContextMenu.Item>
+          ))}
           <ContextMenu.Separator className="workspace-menu-separator" />
           <ContextMenu.Item className="workspace-menu-item" onSelect={resetLayout}>
             Reset layout

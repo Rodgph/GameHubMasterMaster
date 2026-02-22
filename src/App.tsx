@@ -11,12 +11,14 @@ export function App() {
   const bootstrapSession = useSessionStore((state) => state.bootstrapSession);
   const isBootstrapping = useSessionStore((state) => state.isBootstrapping);
   const sessionReady = useSessionStore((state) => state.sessionReady);
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const isWallpaperHostRoute = hash.startsWith("#/wallpaper-host");
 
   useEffect(() => {
     void bootstrapSession();
   }, [bootstrapSession]);
 
-  if (isBootstrapping || !sessionReady) {
+  if (!isWallpaperHostRoute && (isBootstrapping || !sessionReady)) {
     return <FullScreenLoader />;
   }
 

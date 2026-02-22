@@ -1,6 +1,7 @@
 type ChatEnv = {
   DB: D1Database;
   ROOMS: DurableObjectNamespace;
+  REALTIME: DurableObjectNamespace;
 };
 
 type JsonResponse = (data: unknown, request: Request, status?: number) => Response;
@@ -44,6 +45,35 @@ async function broadcastRoomEvent(env: ChatEnv, roomId: string, event: unknown) 
     method: "POST",
     body: JSON.stringify(event),
   });
+}
+
+async function broadcastRoomUpdated(
+  env: ChatEnv,
+  roomId: string,
+  payload: { lastMessageAt: string; lastMessagePreview: string; senderId: string },
+) {
+  const members = await env.DB.prepare("SELECT user_id FROM chat_room_members WHERE room_id = ?")
+    .bind(roomId)
+    .all<{ user_id: string }>();
+
+  const body = JSON.stringify({
+    type: "room_updated",
+    payload: {
+      roomId,
+      lastMessageAt: payload.lastMessageAt,
+      lastMessagePreview: payload.lastMessagePreview,
+      senderId: payload.senderId,
+    },
+  });
+
+  for (const member of members.results ?? []) {
+    const doId = env.REALTIME.idFromName(`realtime:${member.user_id}`);
+    const stub = env.REALTIME.get(doId);
+    await stub.fetch("https://realtime.internal/broadcast", {
+      method: "POST",
+      body,
+    });
+  }
 }
 
 function normalizeMessage(row: ChatMessageRow) {
@@ -188,6 +218,11 @@ async function createMessage({ request, env, userId, json }: ChatRouteContext, r
     type: "chat:message_new",
     payload: { message },
   });
+  await broadcastRoomUpdated(env, roomId, {
+    lastMessageAt: createdAt,
+    lastMessagePreview: text.slice(0, 120),
+    senderId: userId,
+  });
 
   return json({ message }, request, 201);
 }
@@ -216,6 +251,11 @@ async function editMessage({ request, env, userId, json }: ChatRouteContext, mes
     type: "chat:message_edit",
     payload: { messageId, body: text, editedAt },
   });
+  await broadcastRoomUpdated(env, current.room_id, {
+    lastMessageAt: editedAt,
+    lastMessagePreview: text.slice(0, 120),
+    senderId: userId,
+  });
 
   return json({ messageId, body: text, editedAt }, request);
 }
@@ -239,6 +279,11 @@ async function deleteMessage({ request, env, userId, json }: ChatRouteContext, m
   await broadcastRoomEvent(env, current.room_id, {
     type: "chat:message_delete",
     payload: { messageId, deletedAt },
+  });
+  await broadcastRoomUpdated(env, current.room_id, {
+    lastMessageAt: deletedAt,
+    lastMessagePreview: "[mensagem removida]",
+    senderId: userId,
   });
 
   return json({ messageId, deletedAt }, request);
