@@ -113,7 +113,6 @@ export function DockShell({
   const startResizeSplit = (
     event: ReactPointerEvent<HTMLElement>,
     splitId: string,
-    direction: "row" | "column",
   ) => {
     if (event.button !== 0) return;
 
@@ -143,11 +142,15 @@ export function DockShell({
       }
 
       const rect = splitEl.getBoundingClientRect();
-      if (direction === "row" && rect.width > 0) {
+      const renderedDirection = window.getComputedStyle(splitEl).flexDirection.startsWith("column")
+        ? "column"
+        : "row";
+
+      if (renderedDirection === "row" && rect.width > 0) {
         const ratio = (moveEvent.clientX - rect.left) / rect.width;
         setDockSplitRatio(splitId, Math.max(0.15, Math.min(0.85, ratio)));
       }
-      if (direction === "column" && rect.height > 0) {
+      if (renderedDirection === "column" && rect.height > 0) {
         const ratio = (moveEvent.clientY - rect.top) / rect.height;
         setDockSplitRatio(splitId, Math.max(0.15, Math.min(0.85, ratio)));
       }
@@ -233,6 +236,7 @@ export function DockShell({
     if (!activeWidget) return null;
 
     const module = moduleRegistryById[activeWidget.moduleId];
+    if (!module) return null;
     const ModuleComponent = module.component;
 
     return (
@@ -247,6 +251,7 @@ export function DockShell({
               .filter((widget): widget is WidgetLayout => Boolean(widget))
               .map((widget) => {
                 const tabModule = moduleRegistryById[widget.moduleId];
+                if (!tabModule) return null;
                 const isActive = widget.id === node.activeWidgetId;
                 return (
                   <button
@@ -281,7 +286,8 @@ export function DockShell({
                     </span>
                   </button>
                 );
-              })}
+              })
+              .filter(Boolean)}
           </div>
         </header>
         <div className="dock-content">
@@ -310,7 +316,7 @@ export function DockShell({
       <div
         className={`dock-divider dock-divider-${node.direction}`}
         data-no-drag="true"
-        onPointerDown={(event) => startResizeSplit(event, node.id, node.direction)}
+        onPointerDown={(event) => startResizeSplit(event, node.id)}
       />
       <div className="dock-split-child" style={{ flexGrow: 1 - node.ratio }}>
         <DockShell

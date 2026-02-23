@@ -5,7 +5,6 @@ import { useSessionStore } from "../core/stores/sessionStore";
 import { LoginPage } from "./Login";
 import { RegisterPage } from "./Register";
 import { WidgetWindow } from "./WidgetWindow";
-import { WallpaperHostPage } from "./wallpaper/WallpaperHostPage";
 
 function RequireLoggedUser({ children }: { children: ReactElement }) {
   const sessionReady = useSessionStore((state) => state.sessionReady);
@@ -24,7 +23,6 @@ export const router = createHashRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/widget", element: <WidgetWindow /> },
-  { path: "/wallpaper-host", element: <WallpaperHostPage /> },
   {
     path: "/chat",
     element: (

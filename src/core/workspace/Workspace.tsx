@@ -8,6 +8,7 @@ import { useLayoutStore } from "./layoutStore";
 import { DockShell } from "./shells/DockShell";
 import { WidgetShell } from "./shells/WidgetShell";
 import "./Workspace.css";
+import "./Workspace.responsive.css";
 import { isTauri } from "../platform/isTauri";
 import { tauriListen } from "../platform/tauriEvents";
 import { GlobalSearchOverlay } from "../../shared/search/ui/GlobalSearchOverlay/GlobalSearchOverlay";

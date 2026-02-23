@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { FiRefreshCw, FiSave } from "react-icons/fi";
 import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { FiRefreshCw, FiSave } from "../../../shared/ui/icons";
 import { BaseActionButton, BasePillInput } from "../../../shared/ui";
 import { getChatProfileById, updateMyChatProfile } from "../data/users.repository";
 

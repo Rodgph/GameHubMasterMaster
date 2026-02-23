@@ -48,11 +48,12 @@ type BootstrapBody = {
 
 async function apiFetch<T>(path: string, init: RequestInit, token: string): Promise<T> {
   const apiBase = getApiBaseOrThrow();
+  const isFormDataBody = typeof FormData !== "undefined" && init.body instanceof FormData;
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
     headers: {
-      "content-type": "application/json",
       authorization: `Bearer ${token}`,
+      ...(isFormDataBody ? {} : { "content-type": "application/json" }),
       ...(init.headers ?? {}),
     },
   });

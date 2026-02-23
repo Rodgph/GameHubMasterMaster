@@ -82,7 +82,11 @@ function getNextZ(widgets: WidgetLayout[]) {
 }
 
 function clampWidget(widget: WidgetLayout): WidgetLayout {
-  const constraints = moduleRegistryById[widget.moduleId].widgetConstraints;
+  const module = moduleRegistryById[widget.moduleId];
+  if (!module) {
+    return widget;
+  }
+  const constraints = module.widgetConstraints;
   return {
     ...widget,
     w: Math.max(widget.w, constraints.minWidth),
@@ -499,7 +503,9 @@ export const useLayoutStore = create<LayoutState>()(
       partialize: (state) => ({ widgets: state.widgets, dockTree: state.dockTree }),
       merge: (persistedState, currentState) => {
         const typed = persistedState as Partial<LayoutState> | undefined;
-        const persistedWidgets = typed?.widgets ?? currentState.widgets;
+        const persistedWidgets = (typed?.widgets ?? currentState.widgets).filter(
+          (widget) => Boolean(moduleRegistryById[widget.moduleId]),
+        );
         return {
           ...currentState,
           ...typed,

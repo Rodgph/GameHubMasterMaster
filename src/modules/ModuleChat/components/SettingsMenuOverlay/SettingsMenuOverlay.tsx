@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { FiLogOut, FiUser } from "react-icons/fi";
-import { IoChatboxOutline } from "react-icons/io5";
+import { FiLogOut, FiUser, IoChatboxOutline } from "../../../../shared/ui/icons";
 import { MenuItem } from "../MenuItem/MenuItem";
 import "./SettingsMenuOverlay.css";
 

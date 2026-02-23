@@ -1,6 +1,6 @@
-import { RiUserFollowLine, RiUserUnfollowLine } from "react-icons/ri";
 import { AvatarCircle } from "../../../../shared/ui";
 import { BaseActionButton } from "../../../../shared/ui";
+import { RiUserFollowLine, RiUserUnfollowLine } from "../../../../shared/ui/icons";
 import type { UserSearchItem } from "../../hooks/useUserSearch";
 import "./UserSearchOverlay.css";
 

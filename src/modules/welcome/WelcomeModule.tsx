@@ -3,17 +3,15 @@ import { useSessionStore } from "../../core/stores/sessionStore";
 import { useLayoutStore } from "../../core/workspace/layoutStore";
 import "./welcome.css";
 
-const MANAGED_MODULES: Exclude<ModuleId, "welcome">[] = [
+const MANAGED_MODULES: Array<Extract<ModuleId, "chat" | "feed" | "music">> = [
   "chat",
   "feed",
   "music",
-  "motion_wallpaper",
 ];
-const MODULE_LABELS: Record<Exclude<ModuleId, "welcome">, string> = {
+const MODULE_LABELS: Record<Extract<ModuleId, "chat" | "feed" | "music">, string> = {
   chat: "Chat",
   feed: "Feed",
   music: "Music",
-  motion_wallpaper: "Motion Wallpaper",
 };
 
 export function WelcomeModule() {

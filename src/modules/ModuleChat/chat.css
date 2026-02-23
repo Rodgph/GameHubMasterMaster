@@ -259,7 +259,6 @@
   width: min(520px, 100%);
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
   background: #020202;
 }
 
@@ -324,7 +323,6 @@
 .chat-create-story-upload {
   width: 100%;
   height: 42px;
-  border: 1px solid var(--border-subtle);
   border-radius: 14px;
   background: #020202;
   color: var(--text-primary);
@@ -344,7 +342,6 @@
 .chat-create-story-textarea {
   width: 100%;
   min-height: 92px;
-  border: 1px solid var(--border-subtle);
   border-radius: 14px;
   background: #020202;
   color: var(--text-primary);
@@ -359,7 +356,6 @@
 .chat-create-story-preview-wrap {
   width: 100%;
   max-height: 220px;
-  border: 1px solid var(--border-subtle);
   border-radius: 14px;
   overflow: hidden;
   background: #020202;
@@ -376,7 +372,6 @@
 .chat-create-story-publish {
   width: 100%;
   height: 42px;
-  border: 1px solid var(--border-subtle);
   border-radius: 14px;
   background: #020202;
   color: var(--text-primary);

@@ -1,0 +1,209 @@
+.music-footer {
+  position: relative;
+  height: 80px;
+  min-height: 80px;
+  max-height: 80px;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(135deg, rgba(255, 126, 95, 0.18), rgba(86, 204, 242, 0.12)),
+    linear-gradient(180deg, #070707, #020202);
+}
+
+.music-footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  background:
+    radial-gradient(circle at 15% 30%, rgba(255, 255, 255, 0.22), transparent 35%),
+    radial-gradient(circle at 85% 60%, rgba(255, 255, 255, 0.14), transparent 40%);
+  pointer-events: none;
+}
+
+.music-footer-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
+.music-footer-row {
+  width: 100%;
+}
+
+.music-footer-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.music-footer-row-timeline {
+  display: flex;
+  align-items: center;
+}
+
+.music-footer-row-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.music-footer-controls-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.music-footer-timeline {
+  width: 100%;
+  height: 3px;
+  background: #7a7a7a;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.music-footer-timeline-current {
+  width: 36%;
+  height: 100%;
+  background: #fbfbfb;
+}
+
+.music-footer-album-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 100px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.45), transparent 45%),
+    linear-gradient(145deg, #ff7e5f, #3a7bd5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.music-footer-album-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.46);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.music-footer-play-btn.base-icon-button {
+  position: relative;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transform: scale(0.86);
+  pointer-events: none;
+  background: rgba(2, 2, 2, 0.78);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease;
+}
+
+.music-footer-album-cover:hover::after,
+.music-footer-album-cover:focus-within::after {
+  opacity: 1;
+}
+
+.music-footer-album-cover:hover .music-footer-play-btn,
+.music-footer-album-cover:focus-within .music-footer-play-btn {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.music-footer-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.music-footer-title {
+  margin: 0;
+  color: #f6f6f6;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.music-footer-artists {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.music-footer-artist-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  cursor: pointer;
+}
+
+.music-footer-artist-btn:hover {
+  color: #ffffff;
+}
+
+.music-footer-artist-sep {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.music-footer-more-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(2, 2, 2, 0.72);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.music-footer-more-btn:hover {
+  background: rgba(12, 12, 12, 0.86);
+}
+
+.music-footer-more-btn.is-open {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(14, 14, 14, 0.9);
+}
+
+.music-footer-control-btn.base-icon-button {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.music-footer-control-btn.base-icon-button:hover,
+.music-footer-control-btn.base-icon-button:active {
+  background: transparent;
+}

@@ -1,0 +1,1 @@
+export { ModuleFooter } from "../../ModuleFooter";

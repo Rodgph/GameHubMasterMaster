@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getSupabaseClient } from "../../core/services/supabase";
 import { useSessionStore } from "../../core/stores/sessionStore";
+import { AvatarCircle } from "../../shared/ui";
+import { BsGeoAlt, FaImages, IoMdMusicalNote } from "../../shared/ui/icons";
 import { useFeedStore } from "./feedStore";
 
 export function PostComposer() {
@@ -9,20 +11,6 @@ export function PostComposer() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const addPost = useFeedStore((state) => state.addPost);
   const user = useSessionStore((state) => state.user);
-
-  const [previewUrl, setPreviewUrl] = useState("");
-
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl("");
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [file]);
 
   async function uploadImage(selected: File) {
     if (!user) throw new Error("Usuario nao autenticado.");
@@ -56,7 +44,8 @@ export function PostComposer() {
   }
 
   return (
-    <div className="feed-composer">
+    <div className="feed-composer" data-no-drag="true">
+      <AvatarCircle src={user?.avatar_url ?? undefined} alt={user?.username ?? "user"} size={42} />
       <textarea
         data-no-drag="true"
         value={body}
@@ -64,12 +53,10 @@ export function PostComposer() {
         placeholder="Compartilhe algo..."
         rows={4}
       />
-      {previewUrl ? (
-        <img className="feed-composer-preview" src={previewUrl} alt="preview de upload" />
-      ) : null}
       <div className="feed-composer-actions">
-        <label className="feed-button" data-no-drag="true">
-          Imagem
+        <label className="feed-button feed-button-icon" data-no-drag="true" title="Imagem">
+          <FaImages size={14} />
+          <span>Imagem</span>
           <input
             data-no-drag="true"
             className="feed-file-input"
@@ -78,6 +65,14 @@ export function PostComposer() {
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
+        <button data-no-drag="true" type="button" className="feed-button feed-button-icon" title="Location">
+          <BsGeoAlt size={14} />
+          <span>Location</span>
+        </button>
+        <button data-no-drag="true" type="button" className="feed-button feed-button-icon" title="Music">
+          <IoMdMusicalNote size={14} />
+          <span>Music</span>
+        </button>
         <button data-no-drag="true" type="button" onClick={onSubmit} disabled={isSubmitting}>
           Publicar
         </button>

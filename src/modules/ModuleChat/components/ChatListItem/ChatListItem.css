@@ -2,7 +2,6 @@
   width: 100%;
   height: 80px;
   background: #020202;
-  border: 1px solid var(--border-subtle);
   border-radius: 20px;
   display: flex;
   align-items: center;

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { FiCopy, FiCornerUpLeft, FiEdit2, FiMapPin, FiPlus, FiStar, FiTrash2 } from "react-icons/fi";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { FiCopy, FiCornerUpLeft, FiEdit2, FiMapPin, FiPlus, FiStar, FiTrash2 } from "../../../shared/ui/icons";
 import { useChatStore } from "../chatStore";
 import { getGroupByRoomId, type GroupView } from "../data/groups.repository";
 import { ensureDMRoomLink } from "../data/dm.repository";

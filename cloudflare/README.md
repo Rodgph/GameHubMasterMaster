@@ -25,6 +25,14 @@ No `wrangler.toml`:
 - `SUPABASE_JWT_ISS`
 - `SUPABASE_JWT_AUD`
 
+## 2.1) Configurar R2 (assets de musica)
+
+```bash
+npx wrangler r2 bucket create gamehubmastermaster-music-assets
+```
+
+Binding ja definido no `wrangler.toml` como `MUSIC_ASSETS`.
+
 ## 3) Rodar worker local
 
 ```bash
@@ -47,3 +55,17 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 - `GET /modules`
 - `PUT /modules`
 - `GET /realtime/ws` (WebSocket)
+- `GET /music/home`
+- `GET /music/genres`
+- `POST /music/genres`
+- `POST /music/uploads/image`
+- `POST /music/artists`
+- `GET /music/artists/:id/albums`
+- `POST /music/albums`
+- `GET /music/albums/:id/tracks`
+- `POST /music/tracks`
+- `POST /music/tracks/:id/like`
+- `DELETE /music/tracks/:id/like`
+- `POST /music/albums/:id/like`
+- `DELETE /music/albums/:id/like`
+- `POST /music/tracks/:id/listen`

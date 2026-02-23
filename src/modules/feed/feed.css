@@ -2,25 +2,37 @@
   gap: 12px;
 }
 
-.feed-status {
-  color: var(--text-secondary);
-  font-size: 12px;
+.feed-header {
+  display: block;
 }
 
 .feed-composer {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
 }
 
+.feed-composer-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.feed-composer-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .feed-composer textarea {
-  width: 100%;
-  min-height: 92px;
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
   resize: vertical;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   color: var(--text-primary);
   padding: 8px;
@@ -30,7 +42,6 @@
   max-width: 100%;
   max-height: 300px;
   object-fit: cover;
-  border: 1px solid var(--border-subtle);
 }
 
 .feed-composer-actions,
@@ -45,6 +56,10 @@
   gap: 8px;
 }
 
+.feed-composer-actions {
+  flex-shrink: 0;
+}
+
 .feed-button,
 .feed-load-more,
 .feed-post-actions button,
@@ -56,7 +71,6 @@
 .feed-edit-row button,
 .feed-reaction-picker button,
 .feed-edited button {
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   color: var(--text-primary);
   height: 32px;
@@ -97,7 +111,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-primary);
   padding: 10px;
@@ -123,7 +136,6 @@
   width: 100%;
   max-height: 400px;
   object-fit: cover;
-  border: 1px solid var(--border-subtle);
 }
 
 .feed-like-button.active {
@@ -137,7 +149,6 @@
 }
 
 .feed-reaction-pill {
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   color: var(--text-secondary);
   padding: 4px 8px;
@@ -147,17 +158,22 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   padding: 8px;
 }
 
 .feed-comments {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.feed-button-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .feed-comments-list {
@@ -167,7 +183,6 @@
 }
 
 .feed-comment-item {
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   padding: 8px;
 }
@@ -181,7 +196,6 @@
 .feed-edit-row textarea {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   color: var(--text-primary);
   padding: 8px;
@@ -214,7 +228,6 @@
   width: min(760px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   overflow: auto;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-module);
   color: var(--text-primary);
   padding: 12px;
@@ -232,7 +245,6 @@
 
 .feed-version-item,
 .feed-data-grid section {
-  border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   padding: 8px;
 }

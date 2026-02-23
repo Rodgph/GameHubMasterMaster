@@ -1,5 +1,3 @@
-mod motion_wallpaper;
-
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg(target_os = "windows")]
@@ -60,10 +58,7 @@ fn close_window(app: tauri::AppHandle, label: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .manage(motion_wallpaper::MotionWallpaperRuntime::default())
     .setup(|app| {
-      motion_wallpaper::register_event_listeners(&app.handle());
-
       let window = app.get_webview_window("main").expect("main window not found");
       let _ = window.set_decorations(false);
       let _ = window.set_shadow(false);
@@ -83,20 +78,7 @@ pub fn run() {
     })
     .invoke_handler(tauri::generate_handler![
       open_widget_window,
-      close_window,
-      motion_wallpaper::motion_wallpaper_pick_video,
-      motion_wallpaper::motion_wallpaper_start,
-      motion_wallpaper::motion_wallpaper_set_video,
-      motion_wallpaper::motion_wallpaper_set_volume,
-      motion_wallpaper::motion_wallpaper_apply,
-      motion_wallpaper::motion_wallpaper_apply_ex,
-      motion_wallpaper::motion_wallpaper_get_monitors,
-      motion_wallpaper::motion_wallpaper_stop,
-      motion_wallpaper::motion_wallpaper_reload_host,
-      motion_wallpaper::motion_wallpaper_host_ready,
-      motion_wallpaper::motion_wallpaper_status,
-      motion_wallpaper::motion_wallpaper_debug_state,
-      motion_wallpaper::motion_wallpaper_set_click_through
+      close_window
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

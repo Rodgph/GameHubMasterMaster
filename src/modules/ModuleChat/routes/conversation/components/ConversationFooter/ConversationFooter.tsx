@@ -1,9 +1,6 @@
 import { useState } from "react";
-import { HiOutlineMicrophone } from "react-icons/hi";
-import { IoMdAttach } from "react-icons/io";
-import { LuSend } from "react-icons/lu";
-import { RiEmotionLaughLine } from "react-icons/ri";
 import { BaseIconButton, BasePillInput } from "../../../../../../shared/ui";
+import { HiOutlineMicrophone, IoMdAttach, LuSend, RiEmotionLaughLine } from "../../../../../../shared/ui/icons";
 import "./ConversationFooter.css";
 
 type ConversationFooterProps = {

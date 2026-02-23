@@ -1,12 +1,11 @@
 import { useEffect } from "react";
-import { PostComposer } from "./PostComposer";
+import { FeedHeader } from "./FeedHeader";
 import { PostList } from "./PostList";
 import { useFeedStore } from "./feedStore";
 import { PostDataModal } from "./PostDataModal";
 import "./feed.css";
 
 export function FeedModule() {
-  const wsStatus = useFeedStore((state) => state.wsStatus);
   const loadPosts = useFeedStore((state) => state.loadPosts);
   const connectWs = useFeedStore((state) => state.connectWs);
   const disconnectWs = useFeedStore((state) => state.disconnectWs);
@@ -22,8 +21,7 @@ export function FeedModule() {
 
   return (
     <section className="feed-module module-body">
-      <div className="feed-status">WS: {wsStatus}</div>
-      <PostComposer />
+      <FeedHeader />
       <PostList />
       {activePostId ? <PostDataModal postId={activePostId} /> : null}
     </section>

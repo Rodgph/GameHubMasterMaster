@@ -14,7 +14,6 @@
   max-height: 90vh;
   overflow: auto;
   background: #111;
-  border: 1px solid var(--border-subtle);
   border-radius: 20px;
   padding: 12px;
   display: flex;
@@ -61,7 +60,6 @@
 
 .create-group-overlay-input,
 .create-group-overlay-textarea {
-  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: #020202;
   color: var(--text-primary);

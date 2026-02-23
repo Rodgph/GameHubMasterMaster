@@ -21,6 +21,7 @@ type WidgetShellProps = {
 
 export function WidgetShell({ widget, onDragMove, onDragEnd }: WidgetShellProps) {
   const module = moduleRegistryById[widget.moduleId];
+  if (!module) return null;
   const closeWidget = useLayoutStore((state) => state.closeWidget);
   const updateWidget = useLayoutStore((state) => state.updateWidget);
   const bringToFront = useLayoutStore((state) => state.bringToFront);

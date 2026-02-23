@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { FaPause, FaPlay } from "react-icons/fa";
-import { FiTrash2 } from "react-icons/fi";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
 import { BaseIconButton } from "../../../shared/ui";
+import { FaPause, FaPlay, FiTrash2 } from "../../../shared/ui/icons";
 import { StoryCreateHeader, StoryReplyFooter } from "../components";
 import { ConversationHeader } from "./conversation/components";
 import {

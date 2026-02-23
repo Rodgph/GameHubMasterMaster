@@ -1,0 +1,12 @@
+/* Responsive overrides for dock layout on narrow workspaces */
+@media (max-width: 860px) {
+  .workspace-canvas .dock-split.dock-row {
+    flex-direction: column;
+  }
+
+  .workspace-canvas .dock-split.dock-row > .dock-divider-row {
+    width: 100%;
+    height: 8px;
+    cursor: row-resize;
+  }
+}

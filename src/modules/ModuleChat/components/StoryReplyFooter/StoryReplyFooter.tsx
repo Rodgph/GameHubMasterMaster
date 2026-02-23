@@ -1,6 +1,5 @@
-import { HiOutlineMicrophone } from "react-icons/hi";
-import { RiEmotionLaughLine } from "react-icons/ri";
 import { BaseIconButton, BasePillInput } from "../../../../shared/ui";
+import { HiOutlineMicrophone, RiEmotionLaughLine } from "../../../../shared/ui/icons";
 
 type StoryReplyFooterProps = {
   value: string;

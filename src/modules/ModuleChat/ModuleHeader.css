@@ -1,12 +1,8 @@
 .module-header {
-  background: #111111;
-  border-radius: 20px 20px 0 0;
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 12px 14px 0;
+
 }
 
 .module-header-top-row {
-  height: 60px;
   display: flex;
   align-items: center;
   gap: 10px;

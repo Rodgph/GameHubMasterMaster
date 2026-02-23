@@ -3,7 +3,6 @@
   height: 80px;
   background: #020202;
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
   position: relative;
   flex: 0 0 auto;
   cursor: pointer;

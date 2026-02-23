@@ -40,11 +40,24 @@ export type MetadataRecord = {
   value: string;
 };
 
+export type LocalMusicHistoryRecord = {
+  id: string;
+  userId: string;
+  trackId: string;
+  title: string;
+  artist: string;
+  albumId: string;
+  albumTitle: string;
+  albumCoverKey: string | null;
+  listenedAt: number;
+};
+
 class GameHubLocalDb extends Dexie {
   conversations!: Table<LocalConversation, string>;
   messages!: Table<LocalMessageRecord, string>;
   outbox!: Table<OutboxRecord, string>;
   metadata!: Table<MetadataRecord, string>;
+  musicHistory!: Table<LocalMusicHistoryRecord, string>;
 
   constructor() {
     super("gamehub_local_v1");
@@ -53,6 +66,13 @@ class GameHubLocalDb extends Dexie {
       messages: "id, &clientId, [conversationId+createdAt], conversationId, createdAt, status",
       outbox: "clientId, conversationId, createdAt",
       metadata: "key",
+    });
+    this.version(2).stores({
+      conversations: "id, updatedAt, lastMessageAt",
+      messages: "id, &clientId, [conversationId+createdAt], conversationId, createdAt, status",
+      outbox: "clientId, conversationId, createdAt",
+      metadata: "key",
+      musicHistory: "id, userId, trackId, listenedAt, [userId+listenedAt]",
     });
   }
 }

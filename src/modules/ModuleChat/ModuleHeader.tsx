@@ -1,6 +1,5 @@
-import { FaRegHeart } from "react-icons/fa";
-import { IoSettingsOutline } from "react-icons/io5";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { FaRegHeart, IoSettingsOutline } from "../../shared/ui/icons";
 import { BaseIconButton, BasePillInput } from "../../shared/ui";
 import { StoryItem } from "./StoryItem";
 import "./ModuleHeader.css";

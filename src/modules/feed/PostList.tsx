@@ -4,7 +4,6 @@ import { PostCard } from "./PostCard";
 
 export function PostList() {
   const posts = useFeedStore((state) => state.posts);
-  const wsStatus = useFeedStore((state) => state.wsStatus);
   const loadPosts = useFeedStore((state) => state.loadPosts);
   const userFilterId = useFeedStore((state) => state.userFilterId);
   const setUserFilterId = useFeedStore((state) => state.setUserFilterId);
@@ -20,7 +19,7 @@ export function PostList() {
   return (
     <div className="feed-list" data-no-drag="true">
       <div className="feed-list-header">
-        <span>Status: {wsStatus}</span>
+        <span>{filteredPosts.length} posts</span>
         {userFilterId ? (
           <button data-no-drag="true" type="button" onClick={() => setUserFilterId(null)}>
             Ver todos os posts

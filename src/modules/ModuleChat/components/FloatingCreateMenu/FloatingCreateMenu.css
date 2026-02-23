@@ -9,6 +9,10 @@
   gap: 8px;
 }
 
+.chat-home-layout > .floating-create-menu {
+  position: absolute;
+}
+
 .floating-create-menu-trigger {
   width: 40px;
   height: 40px;
@@ -33,7 +37,6 @@
   padding: 8px;
   border-radius: 16px;
   background: #111111;
-  border: 1px solid var(--border-subtle);
 }
 
 .floating-create-menu-dropdown button {

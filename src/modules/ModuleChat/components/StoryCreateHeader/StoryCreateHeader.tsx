@@ -1,10 +1,5 @@
-import { FiLayout } from "react-icons/fi";
-import { HiOutlineMicrophone } from "react-icons/hi";
-import { IoMdMusicalNote } from "react-icons/io";
-import { GoPencil } from "react-icons/go";
-import { IoMdAttach } from "react-icons/io";
-import { FaCheck } from "react-icons/fa";
 import { BaseIconButton } from "../../../../shared/ui";
+import { FaCheck, FiLayout, GoPencil, HiOutlineMicrophone, IoMdAttach, IoMdMusicalNote } from "../../../../shared/ui/icons";
 import "./StoryCreateHeader.css";
 
 type StoryCreateMode = "text" | "music" | "layout" | "voice";

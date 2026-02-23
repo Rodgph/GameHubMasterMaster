@@ -25,7 +25,6 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
 }
 
@@ -40,7 +39,6 @@
 
 .welcome-continue {
   height: 36px;
-  border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-primary);
 }

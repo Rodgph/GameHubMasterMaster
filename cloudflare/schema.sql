@@ -94,3 +94,106 @@ CREATE INDEX IF NOT EXISTS idx_feed_posts_created ON feed_posts(created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_feed_post_versions ON feed_post_versions(post_id, edited_at);
 -- === FEED END ===
+
+-- === MUSIC START ===
+CREATE TABLE IF NOT EXISTS music_artists (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  avatar_key TEXT,
+  cover_key TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_albums (
+  id TEXT PRIMARY KEY,
+  artist_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  cover_key TEXT,
+  release_date TEXT,
+  kind TEXT NOT NULL DEFAULT 'album' CHECK (kind IN ('single', 'ep', 'album')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (artist_id) REFERENCES music_artists(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_tracks (
+  id TEXT PRIMARY KEY,
+  album_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  audio_key TEXT NOT NULL,
+  duration_sec INTEGER,
+  track_number INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (album_id) REFERENCES music_albums(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_genres (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS music_album_genres (
+  album_id TEXT NOT NULL,
+  genre_id TEXT NOT NULL,
+  PRIMARY KEY (album_id, genre_id),
+  FOREIGN KEY (album_id) REFERENCES music_albums(id) ON DELETE CASCADE,
+  FOREIGN KEY (genre_id) REFERENCES music_genres(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_track_genres (
+  track_id TEXT NOT NULL,
+  genre_id TEXT NOT NULL,
+  PRIMARY KEY (track_id, genre_id),
+  FOREIGN KEY (track_id) REFERENCES music_tracks(id) ON DELETE CASCADE,
+  FOREIGN KEY (genre_id) REFERENCES music_genres(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_track_likes (
+  track_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (track_id, user_id),
+  FOREIGN KEY (track_id) REFERENCES music_tracks(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_album_likes (
+  album_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (album_id, user_id),
+  FOREIGN KEY (album_id) REFERENCES music_albums(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS music_recent_listens (
+  user_id TEXT NOT NULL,
+  track_id TEXT NOT NULL,
+  listened_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, track_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (track_id) REFERENCES music_tracks(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_music_genres_slug ON music_genres(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_music_genres_name_nocase ON music_genres(name COLLATE NOCASE);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_music_artists_user_slug ON music_artists(user_id, slug);
+CREATE INDEX IF NOT EXISTS idx_music_artists_user_created ON music_artists(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_music_albums_artist_created ON music_albums(artist_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_music_tracks_album_number ON music_tracks(album_id, track_number, created_at);
+CREATE INDEX IF NOT EXISTS idx_music_track_likes_track ON music_track_likes(track_id);
+CREATE INDEX IF NOT EXISTS idx_music_album_likes_album ON music_album_likes(album_id);
+CREATE INDEX IF NOT EXISTS idx_music_recent_listens_user_time ON music_recent_listens(user_id, listened_at DESC);
+
+INSERT OR IGNORE INTO music_genres (id, name, slug) VALUES
+  ('genre-exp-pop', 'exp pop', 'exp-pop'),
+  ('genre-hip-hop', 'hip hop', 'hip-hop'),
+  ('genre-funk', 'funk', 'funk'),
+  ('genre-rage', 'rage', 'rage'),
+  ('genre-plug', 'plug', 'plug'),
+  ('genre-drill', 'drill', 'drill');
+-- === MUSIC END ===

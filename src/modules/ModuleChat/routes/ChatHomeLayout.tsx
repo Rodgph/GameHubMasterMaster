@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { FiBell, FiBellOff, FiMail, FiStar, FiTrash2 } from "react-icons/fi";
-import { RiUserFollowLine, RiUserUnfollowLine } from "react-icons/ri";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { cloudRealtimeWsUrl } from "../../../core/services/cloudflareApi";
 import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { FiBell, FiBellOff, FiMail, FiStar, FiTrash2, RiUserFollowLine, RiUserUnfollowLine } from "../../../shared/ui/icons";
 import { useChatStore } from "../chatStore";
 import { CreateGroupOverlay, FloatingCreateMenu, ModuleHeader, SettingsMenuOverlay, UserSearchOverlay } from "../components";
 import { getOrCreateDMRoom } from "../data/dm.repository";
@@ -20,6 +19,7 @@ import {
   markRead,
   markUnread,
   removeOpenConversation,
+  shouldKeepConversationRemoved,
   toggleMuted,
   togglePinned,
 } from "../utils/openConversations";
@@ -165,6 +165,16 @@ export function ChatHomeLayout() {
 
       let changed = false;
       for (const entry of dmEntries) {
+        if (
+          shouldKeepConversationRemoved({
+            userId: entry.peerId,
+            roomId: entry.roomId,
+            lastMessageAt: entry.lastMessageAt,
+          })
+        ) {
+          continue;
+        }
+
         const profile = profileById.get(entry.peerId);
         if (!profile) continue;
 
@@ -344,7 +354,7 @@ export function ChatHomeLayout() {
 
   const handleRemoveConversation = () => {
     if (!contextUserId) return;
-    const next = removeOpenConversation(contextUserId);
+    const next = removeOpenConversation(contextUserId, contextConversation?.roomId);
     setOpenConversations(next);
     closeContextMenu();
   };

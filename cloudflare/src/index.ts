@@ -4,9 +4,11 @@ import { RoomDO } from "./do/RoomDO";
 import { RealtimeDO } from "./realtime";
 import { handleChatRoutes } from "./routes/chat";
 import { handleFeedRoutes } from "./routes/feed";
+import { handleMusicRoutes } from "./routes/music";
 
 type Env = {
   DB: D1Database;
+  MUSIC_ASSETS?: R2Bucket;
   REALTIME: DurableObjectNamespace;
   ROOMS: DurableObjectNamespace;
   FEED: DurableObjectNamespace;
@@ -324,6 +326,16 @@ const worker: ExportedHandler<Env> = {
       });
       if (feedResponse) {
         return feedResponse;
+      }
+
+      const musicResponse = await handleMusicRoutes({
+        request,
+        env,
+        userId: verified.userId,
+        json,
+      });
+      if (musicResponse) {
+        return musicResponse;
       }
 
       if (request.method === "POST" && url.pathname === "/bootstrap") {

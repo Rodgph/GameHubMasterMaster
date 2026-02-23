@@ -1,10 +1,21 @@
+import { MusicModuleLayout } from "./MusicModuleLayout";
+import { MusicHomeRoute } from "./routes";
+import "./music.css";
+
 export function MusicModule() {
   return (
-    <section className="module-body">
-      <h3>Music Placeholder</h3>
-      <label htmlFor="volume">Volume</label>
-      <input id="volume" type="range" min={0} max={100} defaultValue={40} />
-      <textarea rows={4} placeholder="Textarea para validar foco e digitacao." />
-    </section>
+    <MusicModuleLayout
+      header={null}
+      renderCompact={() => (
+        <div className="music-body-empty" data-no-drag="true">
+          <MusicHomeRoute />
+        </div>
+      )}
+      renderWide={() => (
+        <div className="music-body-empty" data-no-drag="true">
+          <MusicHomeRoute />
+        </div>
+      )}
+    />
   );
 }

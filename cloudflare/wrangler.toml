@@ -35,3 +35,8 @@ new_sqlite_classes = ["FeedDO"]
 SUPABASE_PROJECT_URL = "https://rvtwvaenkbpyktijbjdf.supabase.co"
 SUPABASE_JWT_ISS = "https://rvtwvaenkbpyktijbjdf.supabase.co/auth/v1"
 SUPABASE_JWT_AUD = "authenticated"
+
+[[r2_buckets]]
+binding = "MUSIC_ASSETS"
+bucket_name = "gamehubmastermaster-music-assets"
+preview_bucket_name = "gamehubmastermaster-music-assets"

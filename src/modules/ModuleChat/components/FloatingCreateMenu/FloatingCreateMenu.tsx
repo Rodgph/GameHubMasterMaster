@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiPlus } from "react-icons/fi";
+import { FiPlus } from "../../../../shared/ui/icons";
 import "./FloatingCreateMenu.css";
 
 type FloatingCreateMenuProps = {

@@ -1,5 +1,5 @@
-import { IoIosArrowDown } from "react-icons/io";
 import { BaseIconButton } from "../../../../shared/ui";
+import { IoIosArrowDown } from "../../../../shared/ui/icons";
 
 type ChatPeekButtonProps = {
   userId: string;

@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { FiCornerUpLeft } from "react-icons/fi";
+import { FiCornerUpLeft } from "../../../../../../../shared/ui/icons";
 import type { Message } from "../../../types/message";
 import { MessageMeta } from "../MessageMeta/MessageMeta";
 import "./MessageBubble.css";
