@@ -15,7 +15,6 @@ export {
   FiRepeat,
   FiRefreshCw,
   FiSave,
-  FiSearch,
   FiStar,
   FiTrash2,
   FiUser,

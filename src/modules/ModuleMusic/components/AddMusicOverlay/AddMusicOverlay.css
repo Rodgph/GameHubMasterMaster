@@ -339,3 +339,110 @@
   justify-content: center;
   pointer-events: none;
 }
+
+.music-add-overlay-audio-picker {
+  width: fit-content;
+}
+
+.music-add-overlay-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.music-add-overlay-track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.music-add-overlay-track-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: #0b0b0b;
+  padding: 4px;
+}
+
+.music-add-overlay-track-item.is-active {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.music-add-overlay-track-item-select {
+  flex: 1;
+  min-height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.music-add-overlay-track-item-select:hover {
+  background: #141414;
+}
+
+.music-add-overlay-track-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.music-add-overlay-track-item-lyrics-btn {
+  height: 24px;
+  border-radius: 999px;
+  background: #111111;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.music-add-overlay-track-item-lyrics-btn:hover {
+  background: #181818;
+}
+
+.music-add-overlay-track-item-remove {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.music-add-overlay-track-item-remove:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.music-add-overlay-audio-seek {
+  flex: 1;
+  min-width: 130px;
+}
+
+.music-add-overlay-audio-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.music-add-overlay-audio-native {
+  display: none;
+}

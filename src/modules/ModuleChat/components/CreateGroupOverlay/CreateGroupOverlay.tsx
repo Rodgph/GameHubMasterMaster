@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { AvatarCircle, BasePillInput } from "../../../../shared/ui";
-import type { UserSearchItem } from "../../hooks/useUserSearch";
-import { useUserSearch } from "../../hooks/useUserSearch";
+import { useEffect, useState } from "react";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../../../core/shortcuts/appShortcuts";
+import { BasePillInput } from "../../../../shared/ui";
 import { CreateGroupFooterActions } from "./CreateGroupFooterActions";
 import { CreateGroupHeader } from "./CreateGroupHeader";
-import { SelectedMembersRow } from "./SelectedMembersRow";
+import { SelectedMembersRow, type SelectedMemberItem } from "./SelectedMembersRow";
 import "./CreateGroupOverlay.css";
 
 type CreateGroupOverlaySubmitPayload = {
@@ -32,29 +31,46 @@ export function CreateGroupOverlay({
 }: CreateGroupOverlayProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [memberQuery, setMemberQuery] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState<UserSearchItem[]>([]);
+  const [memberEntry, setMemberEntry] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<SelectedMemberItem[]>([]);
   const [scheduleAt, setScheduleAt] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const { users, loading } = useUserSearch(memberQuery);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (isShortcutPressed(event, APP_SHORTCUTS.CLOSE_OVERLAY)) onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, open]);
 
-  const candidates = useMemo(
-    () =>
-      users.filter(
-        (user) => user.id !== currentUserId && !selectedMembers.some((member) => member.id === user.id),
-      ),
-    [currentUserId, selectedMembers, users],
-  );
+  const addMembersFromEntry = () => {
+    const tokens = memberEntry
+      .split(",")
+      .map((item) => item.trim().replace(/^@+/, ""))
+      .filter(Boolean);
+
+    if (tokens.length === 0) {
+      return;
+    }
+
+    setSelectedMembers((current) => {
+      const next = [...current];
+      for (const token of tokens) {
+        if (token === currentUserId) {
+          continue;
+        }
+        if (next.some((member) => member.id === token)) {
+          continue;
+        }
+        next.push({ id: token, username: token });
+      }
+      return next;
+    });
+    setMemberEntry("");
+  };
 
   const canSubmit = name.trim().length > 0 && selectedMembers.length > 0 && !submitting;
 
@@ -93,41 +109,26 @@ export function CreateGroupOverlay({
           <label className="create-group-overlay-label">
             Integrantes
             <BasePillInput
-              value={memberQuery}
-              onChange={(event) => setMemberQuery(event.target.value)}
-              placeholder="@usuario"
+              value={memberEntry}
+              onChange={(event) => setMemberEntry(event.target.value)}
+              onKeyDown={(event) => {
+                if (isShortcutPressed(event, APP_SHORTCUTS.CONFIRM_WITH_ENTER)) {
+                  event.preventDefault();
+                  addMembersFromEntry();
+                }
+              }}
+              placeholder="id ou @usuario, separados por virgula"
             />
           </label>
+          <button type="button" className="create-group-overlay-user" onClick={addMembersFromEntry}>
+            Adicionar integrante
+          </button>
           <SelectedMembersRow
             members={selectedMembers}
             onRemove={(userId) => {
               setSelectedMembers((current) => current.filter((item) => item.id !== userId));
             }}
           />
-          {memberQuery.trim().length > 0 ? (
-            <div className="create-group-overlay-results" data-no-drag="true">
-              {loading ? <div className="create-group-overlay-empty">Buscando...</div> : null}
-              {!loading && candidates.length === 0 ? (
-                <div className="create-group-overlay-empty">Nenhum usuario encontrado</div>
-              ) : null}
-              {!loading
-                ? candidates.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className="create-group-overlay-user"
-                      onClick={() => {
-                        setSelectedMembers((current) => [...current, user]);
-                        setMemberQuery("");
-                      }}
-                    >
-                      <AvatarCircle src={user.avatar_url ?? undefined} alt={user.username} size={28} />
-                      <span>@{user.username}</span>
-                    </button>
-                  ))
-                : null}
-            </div>
-          ) : null}
           <label className="create-group-overlay-label">
             Descricao (opcional)
             <textarea

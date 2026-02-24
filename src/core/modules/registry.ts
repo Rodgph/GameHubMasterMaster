@@ -2,7 +2,6 @@ import type { RegisteredModule } from "./types";
 import { ChatModule } from "../../modules/ModuleChat/ChatModule";
 import { FeedModule } from "../../modules/ModuleFeed/FeedModule";
 import { MusicModule } from "../../modules/ModuleMusic/MusicModule";
-import { NavModule } from "../../modules/ModuleNav/NavModule";
 import { WelcomeModule } from "../../modules/welcome/WelcomeModule";
 
 export const moduleRegistry: RegisteredModule[] = [
@@ -26,13 +25,6 @@ export const moduleRegistry: RegisteredModule[] = [
     component: MusicModule,
     dockConstraints: { minWidth: 400, height: "100%" },
     widgetConstraints: { minWidth: 400, minHeight: 600 },
-  },
-  {
-    id: "nav",
-    title: "Nav",
-    component: NavModule,
-    dockConstraints: { minWidth: 50, height: "100%" },
-    widgetConstraints: { minWidth: 50, minHeight: 600 },
   },
   {
     id: "welcome",

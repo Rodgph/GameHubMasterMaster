@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../../core/shortcuts/appShortcuts";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { useWorkspaceSearchStore } from "../../../core/workspace/searchStore";
 import { AddMusicOverlay, ModuleFooter, ModuleHeader } from "../components";
 import { useMusicStore } from "../musicStore";
 
@@ -72,6 +74,7 @@ export function MusicHomeRoute() {
   const registerTrackHistory = useMusicStore((state) => state.registerTrackHistory);
   const markTrackListened = useMusicStore((state) => state.markTrackListened);
   const loadHome = useMusicStore((state) => state.loadHome);
+  const musicSearchQuery = useWorkspaceSearchStore((state) => state.queries.music?.trim().toLowerCase() ?? "");
 
   useEffect(() => {
     if (activeFilter === "history") return;
@@ -87,7 +90,7 @@ export function MusicHomeRoute() {
   useEffect(() => {
     if (!addMusicOverlayOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (isShortcutPressed(event, APP_SHORTCUTS.CLOSE_OVERLAY)) {
         closeAddMusicOverlay();
       }
     };
@@ -118,6 +121,18 @@ export function MusicHomeRoute() {
     return current ? `Listined recently in ${current.name}` : "Listined recently";
   }, [activeFilter, activeGenreSlug, genresToRender]);
 
+  const filteredGenresToRender = useMemo(() => {
+    if (!musicSearchQuery) return genresToRender;
+    return genresToRender.filter((genre) => genre.name.toLowerCase().includes(musicSearchQuery));
+  }, [genresToRender, musicSearchQuery]);
+
+  const filteredRecentToRender = useMemo(() => {
+    if (!musicSearchQuery) return recentToRender;
+    return recentToRender.filter((item) =>
+      [item.title, item.artist, item.albumTitle].some((value) => value.toLowerCase().includes(musicSearchQuery)),
+    );
+  }, [musicSearchQuery, recentToRender]);
+
   return (
     <section className="music-home-layout" data-no-drag="true">
       <ModuleHeader />
@@ -126,7 +141,7 @@ export function MusicHomeRoute() {
           <section className="music-home-section" data-no-drag="true">
             <h2 className="music-home-section-title">Genres</h2>
             <div className="music-home-genres-grid" data-no-drag="true">
-              {genresToRender.map((genre) => (
+              {filteredGenresToRender.map((genre) => (
                 <button
                   key={genre.id}
                   type="button"
@@ -146,7 +161,7 @@ export function MusicHomeRoute() {
           {activeFilter !== "history" && homeBusy ? <p className="music-home-loading">Loading...</p> : null}
           {activeFilter === "history" && historyBusy ? <p className="music-home-loading">Loading...</p> : null}
           <div className="music-home-recent-list" data-no-drag="true">
-            {recentToRender.map((item) => (
+            {filteredRecentToRender.map((item) => (
               <button
                 key={item.trackId}
                 type="button"
@@ -186,6 +201,9 @@ export function MusicHomeRoute() {
             ))}
             {activeFilter === "history" && !historyBusy && recentToRender.length === 0 ? (
               <p className="music-home-empty">Seu historico local ainda esta vazio.</p>
+            ) : null}
+            {musicSearchQuery && !homeBusy && !historyBusy && recentToRender.length > 0 && filteredRecentToRender.length === 0 ? (
+              <p className="music-home-empty">Nenhum resultado para a busca.</p>
             ) : null}
           </div>
         </section>

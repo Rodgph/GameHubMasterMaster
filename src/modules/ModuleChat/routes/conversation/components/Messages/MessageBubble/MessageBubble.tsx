@@ -1,7 +1,9 @@
 import type { MouseEvent } from "react";
+import { motion } from "framer-motion";
 import { FiCornerUpLeft } from "../../../../../../../shared/ui/icons";
 import type { Message } from "../../../types/message";
 import { MessageMeta } from "../MessageMeta/MessageMeta";
+import { messageVariants, TRANSITIONS } from "../../../../../../../shared/ui/Animated";
 import "./MessageBubble.css";
 
 type MessageBubbleProps = {
@@ -38,14 +40,22 @@ export function MessageBubble({ message, isOutgoing, onContextMenu }: MessageBub
   const reactions = message.reactions ?? [];
 
   return (
-    <div
+    <motion.div
       className={`message-bubble-row ${isOutgoing ? "outgoing" : "incoming"}`}
       data-no-drag="true"
+      variants={messageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      transition={TRANSITIONS.smooth}
+      layout
     >
-      <article
+      <motion.article
         className={`message-bubble ${isOutgoing ? "outgoing" : "incoming"}`}
         onContextMenu={(event) => onContextMenu?.(event, message, isOutgoing)}
         data-no-drag="true"
+        whileHover={{ scale: 1.02 }}
+        transition={TRANSITIONS.hover}
       >
         {replyLines.length > 0 ? (
           <div className="message-bubble-replies" data-no-drag="true">
@@ -105,7 +115,7 @@ export function MessageBubble({ message, isOutgoing, onContextMenu }: MessageBub
         ) : null}
         {!isImage && !isAudio && !isFile ? <p className="message-bubble-body">{bodyText}</p> : null}
         <MessageMeta message={message} />
-      </article>
-    </div>
+      </motion.article>
+    </motion.div>
   );
 }

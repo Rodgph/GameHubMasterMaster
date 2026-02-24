@@ -9,3 +9,11 @@
   padding: 10px;
   gap: 12px;
 }
+
+.conversation-top-user-card.is-clickable {
+  cursor: pointer;
+}
+
+.conversation-top-user-card.is-clickable:hover {
+  background: #0a0a0a;
+}

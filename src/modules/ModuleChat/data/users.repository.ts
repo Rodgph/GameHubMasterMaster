@@ -24,6 +24,23 @@ export async function fetchChatUsers(): Promise<ChatUser[]> {
   return (data ?? []) as ChatUser[];
 }
 
+export async function searchChatUsers(query: string, limit = 20): Promise<ChatUser[]> {
+  const term = query.trim().replace(/^@+/, "");
+  if (!term) return [];
+
+  const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("chat_profiles")
+    .select("id, username, avatar_url")
+    .ilike("username", `%${term}%`)
+    .order("username", { ascending: true })
+    .limit(safeLimit);
+
+  if (error) throw error;
+  return (data ?? []) as ChatUser[];
+}
+
 export async function getChatProfileById(userId: string): Promise<ChatProfile | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase

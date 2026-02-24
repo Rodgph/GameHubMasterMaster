@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../../../core/shortcuts/appShortcuts";
 import { FiLogOut, FiUser, IoChatboxOutline } from "../../../../shared/ui/icons";
 import { MenuItem } from "../MenuItem/MenuItem";
 import "./SettingsMenuOverlay.css";
@@ -22,7 +23,7 @@ export function SettingsMenuOverlay({
     if (!isOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (isShortcutPressed(event, APP_SHORTCUTS.CLOSE_OVERLAY)) onClose();
     };
 
     window.addEventListener("keydown", onKeyDown);

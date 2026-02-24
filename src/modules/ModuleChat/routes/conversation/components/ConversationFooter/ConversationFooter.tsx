@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../../../../../core/shortcuts/appShortcuts";
 import { BaseIconButton, BasePillInput } from "../../../../../../shared/ui";
 import { HiOutlineMicrophone, IoMdAttach, LuSend, RiEmotionLaughLine } from "../../../../../../shared/ui/icons";
 import "./ConversationFooter.css";
@@ -71,7 +72,7 @@ export function ConversationFooter({
           }
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (isShortcutPressed(event, APP_SHORTCUTS.CONFIRM_WITH_ENTER)) {
             event.preventDefault();
             handleSend();
           }

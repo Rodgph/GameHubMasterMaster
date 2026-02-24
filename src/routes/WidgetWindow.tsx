@@ -22,7 +22,7 @@ export function WidgetWindow() {
   const [params] = useSearchParams();
   const widgetId = params.get("widgetId") ?? "";
   const moduleIdParam = params.get("moduleId") as ModuleId | null;
-  const widget = useLayoutStore((state) => state.widgets.find((entry) => entry.id === widgetId));
+  const widget = useLayoutStore((state) => state.widgetsById[widgetId]);
   const setWidgetRuntimeState = useLayoutStore((state) => state.setWidgetRuntimeState);
   const setWindowBackgroundMode = useLayoutStore((state) => state.setWindowBackgroundMode);
   const effectiveModuleId = widget?.moduleId ?? moduleIdParam;

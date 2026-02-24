@@ -4,6 +4,7 @@ import "./ChatList.css";
 export type ChatListItemModel = {
   userId: string;
   roomId?: string;
+  conversationType: "dm" | "group";
   username: string;
   lastMessage: string;
   avatarUrl?: string;
@@ -12,15 +13,15 @@ export type ChatListItemModel = {
 type ChatListProps = {
   items: ChatListItemModel[];
   currentUserId: string | null;
-  onOpenUserId?: (userId: string) => void;
+  onOpenItem?: (item: ChatListItemModel) => void;
   onPeekUserId?: (userId: string) => void;
-  onOpenContextMenu?: (payload: { x: number; y: number; userId: string }) => void;
+  onOpenContextMenu?: (payload: { x: number; y: number; item: ChatListItemModel }) => void;
 };
 
 export function ChatList({
   items,
   currentUserId,
-  onOpenUserId,
+  onOpenItem,
   onPeekUserId,
   onOpenContextMenu,
 }: ChatListProps) {
@@ -32,10 +33,11 @@ export function ChatList({
           userId={user.userId}
           roomId={user.roomId}
           currentUserId={currentUserId}
+          conversationType={user.conversationType}
           username={user.username}
           lastMessage={user.lastMessage}
           avatarUrl={user.avatarUrl}
-          onOpenUserId={(userId) => onOpenUserId?.(userId)}
+          onOpenItem={(item) => onOpenItem?.(item)}
           onPeekUserId={(userId) => onPeekUserId?.(userId)}
           onOpenContextMenu={onOpenContextMenu}
         />

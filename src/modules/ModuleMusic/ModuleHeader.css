@@ -1,5 +1,5 @@
 .music-header {
-  padding: 14px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -28,17 +28,6 @@
   display: none;
 }
 
-.music-header-search {
-  flex: 1;
-  min-width: 0;
-  max-width: 0;
-  overflow: hidden;
-  transform-origin: right center;
-  transform: scaleX(0);
-  opacity: 0;
-  pointer-events: none;
-  transition: max-width 220ms ease, transform 220ms ease, opacity 180ms ease;
-}
 
 .music-header-actions {
   margin-left: auto;
@@ -48,16 +37,6 @@
   flex-shrink: 0;
 }
 
-.music-header-search.is-open {
-  max-width: 999px;
-  transform: scaleX(1);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.music-header-search-input {
-  width: 100%;
-}
 
 .music-header-subtitle {
   margin: 0;

@@ -1,34 +1,99 @@
 .workspace-canvas {
+  position: relative;
   width: 100%;
   height: 100vh;
-  overflow: auto;
   padding: 6px;
   background: transparent;
+}
+
+.workspace-search-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 60;
+}
+
+.workspace-search-input {
+  width: 100%;
+  height: 30px;
+  border: none;
+  border-radius: 100px;
+  background: #020202;
+  color: var(--text-primary);
+  padding: 0 14px;
+  outline: none;
 }
 
 .workspace-stack {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.workspace-stack input,
+.workspace-stack textarea,
+.workspace-stack [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .workspace-module-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 320px;
-  background: var(--bg-module);
-  color: var(--text-primary);
+  flex: 1;
+  min-height: 0;
   border-radius: 10px;
   overflow: hidden;
+  background: var(--bg-module);
+  color: var(--text-primary);
 }
 
-.workspace-module-card-nav {
-  width: 50px;
-  min-width: 50px;
-  max-width: 50px;
+.workspace-module-card.is-search-active {
+  padding-top: 48px;
+}
+
+.workspace-module-card > * {
+  flex: 1;
   min-height: 0;
-  align-self: flex-start;
+}
+
+.workspace-module-header {
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  background: var(--bg-surface);
+}
+
+.workspace-module-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.workspace-module-close {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.workspace-module-close:hover {
+  background: #1a1a1a;
+  color: var(--text-primary);
 }
 
 .workspace-module-content {
@@ -36,7 +101,6 @@
   min-height: 0;
   overflow: auto;
   padding: 10px;
-  background: var(--bg-module);
 }
 
 .workspace-menu {

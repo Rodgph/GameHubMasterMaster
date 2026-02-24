@@ -90,21 +90,18 @@ function baseModulesMap(): Record<ModuleId, boolean> {
     chat: false,
     feed: false,
     music: false,
-    nav: false,
     welcome: false,
   };
 }
 
 function mergeModulesMap(
   cloudMap: ModulesEnabledMap,
-  currentModules?: Record<ModuleId, boolean>,
 ): Record<ModuleId, boolean> {
   return {
     ...baseModulesMap(),
     chat: Boolean(cloudMap.chat),
     feed: Boolean(cloudMap.feed),
     music: Boolean(cloudMap.music),
-    nav: Boolean(currentModules?.nav),
     welcome: false,
   };
 }
@@ -189,7 +186,7 @@ function connectRealtime(token: string, set: SessionSet, get: () => SessionStore
         const parsed = JSON.parse(String(event.data)) as RealtimeModulesChanged;
         if (parsed.type !== "modules:changed") return;
 
-        const merged = mergeModulesMap(parsed.payload.modulesEnabled, get().modulesEnabled);
+        const merged = mergeModulesMap(parsed.payload.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(merged);
         set(() => ({
           modulesEnabled: merged,
@@ -256,7 +253,7 @@ export const useSessionStore = create<SessionStore>()(
           const fallbackUsername =
             parseUsernameFromEmail(data.session.user.email) || get().lastUsername;
           const boot = await syncFromCloud(token, fallbackUsername || undefined, undefined, null);
-          const mergedModules = mergeModulesMap(boot.modulesEnabled, get().modulesEnabled);
+          const mergedModules = mergeModulesMap(boot.modulesEnabled);
 
           useLayoutStore.getState().applyEnabledModules(mergedModules);
           connectRealtime(token, set, get);
@@ -295,7 +292,7 @@ export const useSessionStore = create<SessionStore>()(
         }
 
         const boot = await syncFromCloud(data.session.access_token, username, undefined, null);
-        const mergedModules = mergeModulesMap(boot.modulesEnabled, get().modulesEnabled);
+        const mergedModules = mergeModulesMap(boot.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(mergedModules);
         connectRealtime(data.session.access_token, set, get);
 
@@ -350,7 +347,7 @@ export const useSessionStore = create<SessionStore>()(
         }
 
         const boot = await syncFromCloud(token, username, displayName, avatarUrl ?? null);
-        const mergedModules = mergeModulesMap(boot.modulesEnabled, get().modulesEnabled);
+        const mergedModules = mergeModulesMap(boot.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(mergedModules);
         connectRealtime(token, set, get);
 
@@ -396,7 +393,7 @@ export const useSessionStore = create<SessionStore>()(
         if (!token) throw new Error("Sessao invalida.");
 
         const response = await cloudPutModules(token, toCloudModulesMap(get().modulesEnabled));
-        const mergedModules = mergeModulesMap(response.modulesEnabled, get().modulesEnabled);
+        const mergedModules = mergeModulesMap(response.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(mergedModules);
 
         set({

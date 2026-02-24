@@ -9,4 +9,3 @@ export * from "./SettingsMenuOverlay/SettingsMenuOverlay";
 export * from "./StoryCreateActionButton/StoryCreateActionButton";
 export * from "./StoryCreateHeader/StoryCreateHeader";
 export * from "./StoryReplyFooter/StoryReplyFooter";
-export * from "./UserSearchOverlay/UserSearchOverlay";

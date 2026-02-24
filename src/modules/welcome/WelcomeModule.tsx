@@ -20,14 +20,14 @@ export function WelcomeModule() {
   const markWelcomeDone = useSessionStore((state) => state.markWelcomeDone);
   const ensureModuleDocked = useLayoutStore((state) => state.ensureModuleDocked);
   const closeWidgetsByModule = useLayoutStore((state) => state.closeWidgetsByModule);
-  const widgets = useLayoutStore((state) => state.widgets);
+  const widgetsById = useLayoutStore((state) => state.widgetsById);
 
   const handleContinue = async () => {
     await markWelcomeDone();
     for (const moduleId of MANAGED_MODULES) {
       if (modulesEnabled[moduleId]) {
         ensureModuleDocked(moduleId);
-      } else if (widgets.some((widget) => widget.moduleId === moduleId)) {
+      } else if (Object.values(widgetsById).some((widget) => widget.moduleId === moduleId)) {
         closeWidgetsByModule(moduleId);
       }
     }

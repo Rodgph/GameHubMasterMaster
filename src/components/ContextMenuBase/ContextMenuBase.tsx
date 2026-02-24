@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../core/shortcuts/appShortcuts";
 import "./ContextMenuBase.css";
 
 type AnchorPoint = {
@@ -129,7 +130,7 @@ export function ContextMenuBase({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (isShortcutPressed(event, APP_SHORTCUTS.CLOSE_OVERLAY)) onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {

@@ -1,7 +1,10 @@
-import type { UserSearchItem } from "../../hooks/useUserSearch";
+export type SelectedMemberItem = {
+  id: string;
+  username: string;
+};
 
 type SelectedMembersRowProps = {
-  members: UserSearchItem[];
+  members: SelectedMemberItem[];
   onRemove: (userId: string) => void;
 };
 

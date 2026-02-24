@@ -108,6 +108,20 @@ export function ChatConversationRoute() {
     return room?.title || "Conversa";
   }, [groupData?.name, room?.title, routeState?.groupName, routeState?.type, routeState?.username]);
 
+  const conversationProfileUserId = useMemo(() => {
+    if (routeState?.type === "group" || groupData) return null;
+    if (routeState?.peerId) return routeState.peerId;
+    if (!currentUserId) return null;
+
+    const title = room?.title ?? "";
+    if (!title.startsWith("dm:")) return null;
+    const [, a, b] = title.split(":");
+    if (!a || !b) return null;
+    if (a === currentUserId) return b;
+    if (b === currentUserId) return a;
+    return null;
+  }, [currentUserId, groupData, room?.title, routeState?.peerId, routeState?.type]);
+
   const mapRecordToMessage = useCallback(
     async (row: ChatMessageRecord): Promise<Message> => {
       let mediaUrl: string | null = null;
@@ -697,6 +711,11 @@ export function ChatConversationRoute() {
             username={headerUsername}
             subtitle={headerSubtitle}
             avatarUrl={routeState?.avatarUrl || groupData?.image_url || undefined}
+            onClick={
+              conversationProfileUserId
+                ? () => navigate(`/chat/profile/${conversationProfileUserId}`)
+                : undefined
+            }
           />
         </div>
       </div>

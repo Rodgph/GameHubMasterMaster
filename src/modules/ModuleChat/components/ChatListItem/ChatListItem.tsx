@@ -10,6 +10,15 @@ import { ConversationFooter } from "../../routes/conversation/components";
 import { AvatarCircle } from "../../../../shared/ui";
 import "./ChatListItem.css";
 
+export type ChatListItemContext = {
+  userId: string;
+  roomId?: string;
+  username: string;
+  lastMessage: string;
+  avatarUrl?: string;
+  conversationType: "dm" | "group";
+};
+
 type ChatListItemProps = {
   userId: string;
   roomId?: string;
@@ -17,9 +26,10 @@ type ChatListItemProps = {
   username: string;
   lastMessage: string;
   avatarUrl?: string;
-  onOpenUserId: (userId: string) => void;
+  conversationType: "dm" | "group";
+  onOpenItem: (item: ChatListItemContext) => void;
   onPeekUserId: (userId: string) => void;
-  onOpenContextMenu?: (payload: { x: number; y: number; userId: string }) => void;
+  onOpenContextMenu?: (payload: { x: number; y: number; item: ChatListItemContext }) => void;
 };
 
 export function ChatListItem({
@@ -29,7 +39,8 @@ export function ChatListItem({
   username,
   lastMessage,
   avatarUrl,
-  onOpenUserId,
+  conversationType,
+  onOpenItem,
   onPeekUserId,
   onOpenContextMenu,
 }: ChatListItemProps) {
@@ -41,6 +52,17 @@ export function ChatListItem({
   const sortedPreviewMessages = useMemo(
     () => [...previewMessages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [previewMessages],
+  );
+  const itemContext = useMemo<ChatListItemContext>(
+    () => ({
+      userId,
+      roomId,
+      username,
+      lastMessage,
+      avatarUrl,
+      conversationType,
+    }),
+    [avatarUrl, conversationType, lastMessage, roomId, userId, username],
   );
 
   useEffect(() => {
@@ -89,11 +111,11 @@ export function ChatListItem({
   return (
     <article
       className={`chat-list-item${expanded ? " is-expanded" : ""}`}
-      onClick={() => onOpenUserId(userId)}
+      onClick={() => onOpenItem(itemContext)}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        onOpenContextMenu?.({ x: event.clientX, y: event.clientY, userId });
+        onOpenContextMenu?.({ x: event.clientX, y: event.clientY, item: itemContext });
       }}
       data-no-drag="true"
     >

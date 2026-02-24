@@ -1,4 +1,5 @@
-import { type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { APP_SHORTCUTS, isShortcutPressed } from "../../../../core/shortcuts/appShortcuts";
 import { cloudApiFetch } from "../../../../core/services/cloudflareApi";
 import { getSupabaseClient } from "../../../../core/services/supabase";
 import { useMusicStore } from "../../musicStore";
@@ -48,6 +49,11 @@ type SelectedGenre = {
   name: string;
   slug: string | null;
   isCustom: boolean;
+};
+
+type TrackSelectionItem = {
+  audioFile: File;
+  lyricsFile: File | null;
 };
 
 type SearchArtistsResponse = {
@@ -109,6 +115,16 @@ function normalizeInput(raw: string) {
 
 function sameText(a: string, b: string) {
   return normalizeInput(a).toLowerCase() === normalizeInput(b).toLowerCase();
+}
+
+function formatAudioTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
+  const value = Math.floor(seconds);
+  const minutes = Math.floor(value / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = (value % 60).toString().padStart(2, "0");
+  return `${minutes}:${secs}`;
 }
 
 type UploadImageResponse = {
@@ -261,6 +277,13 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
   const [artistAvatarFile, setArtistAvatarFile] = useState<File | null>(null);
   const [albumCoverFile, setAlbumCoverFile] = useState<File | null>(null);
   const [trackCoverFile, setTrackCoverFile] = useState<File | null>(null);
+  const [trackSelections, setTrackSelections] = useState<TrackSelectionItem[]>([]);
+  const [activeTrackAudioIndex, setActiveTrackAudioIndex] = useState(0);
+  const [trackPreviewPlaying, setTrackPreviewPlaying] = useState(false);
+  const [trackPreviewDuration, setTrackPreviewDuration] = useState(0);
+  const [trackPreviewCurrentTime, setTrackPreviewCurrentTime] = useState(0);
+  const trackAudioInputRef = useRef<HTMLInputElement | null>(null);
+  const trackAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [artistQuery, setArtistQuery] = useState("");
   const [selectedArtist, setSelectedArtist] = useState<SelectedArtist | null>(null);
@@ -283,6 +306,8 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
 
   const activeGenreSlug = useMusicStore((state) => state.activeGenreSlug);
   const loadHome = useMusicStore((state) => state.loadHome);
+  const activeTrackAudioFile = trackSelections[activeTrackAudioIndex]?.audioFile ?? null;
+  const trackAudioUrl = useObjectUrl(activeTrackAudioFile);
 
   useEffect(() => {
     if (open) return;
@@ -298,6 +323,11 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
     setArtistAvatarFile(null);
     setAlbumCoverFile(null);
     setTrackCoverFile(null);
+    setTrackSelections([]);
+    setActiveTrackAudioIndex(0);
+    setTrackPreviewPlaying(false);
+    setTrackPreviewDuration(0);
+    setTrackPreviewCurrentTime(0);
 
     setArtistQuery("");
     setSelectedArtist(null);
@@ -550,6 +580,57 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
     setArtistAvatarFile(null);
   }, [artistAvatarFile, artistPhotoLocked]);
 
+  useEffect(() => {
+    if (trackSelections.length === 0) {
+      if (activeTrackAudioIndex !== 0) {
+        setActiveTrackAudioIndex(0);
+      }
+      return;
+    }
+
+    if (activeTrackAudioIndex > trackSelections.length - 1) {
+      setActiveTrackAudioIndex(trackSelections.length - 1);
+    }
+  }, [activeTrackAudioIndex, trackSelections]);
+
+  useEffect(() => {
+    const audio = trackAudioRef.current;
+    if (!audio) return;
+
+    const onLoadedMetadata = () => {
+      setTrackPreviewDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      setTrackPreviewCurrentTime(audio.currentTime || 0);
+    };
+    const onTimeUpdate = () => {
+      setTrackPreviewCurrentTime(audio.currentTime || 0);
+    };
+    const onPlay = () => {
+      setTrackPreviewPlaying(true);
+    };
+    const onPause = () => {
+      setTrackPreviewPlaying(false);
+    };
+    const onEnded = () => {
+      setTrackPreviewPlaying(false);
+      setTrackPreviewCurrentTime(0);
+      audio.currentTime = 0;
+    };
+
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+
+    return () => {
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [trackAudioUrl]);
+
   const selectArtist = (artist: ArtistOption) => {
     setSelectedArtist({ id: artist.id, name: artist.name, isCustom: false });
     setArtistQuery("");
@@ -612,8 +693,103 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
     setSelectedGenres((current) => current.filter((item) => genreChipKey(item) !== targetKey));
   };
 
+  const handleTrackAudioSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const pickedFiles = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("audio/"));
+    if (pickedFiles.length === 0) {
+      event.target.value = "";
+      return;
+    }
+
+    setTrackSelections((current) => {
+      const next = [...current];
+      for (const pickedFile of pickedFiles) {
+        const exists = next.some(
+          (item) =>
+            item.audioFile.name === pickedFile.name &&
+            item.audioFile.size === pickedFile.size &&
+            item.audioFile.lastModified === pickedFile.lastModified,
+        );
+        if (!exists) {
+          next.push({ audioFile: pickedFile, lyricsFile: null });
+        }
+      }
+      return next;
+    });
+
+    if (trackSelections.length === 0) {
+      setActiveTrackAudioIndex(0);
+    }
+    event.target.value = "";
+  };
+
+  const handleSelectTrackAudioForPreview = (index: number) => {
+    if (index < 0 || index > trackSelections.length - 1) return;
+    const audio = trackAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setTrackPreviewPlaying(false);
+    setTrackPreviewCurrentTime(0);
+    setTrackPreviewDuration(0);
+    setActiveTrackAudioIndex(index);
+  };
+
+  const handleRemoveTrackAudio = (index: number) => {
+    setTrackSelections((current) => current.filter((_, fileIndex) => fileIndex !== index));
+  };
+
+  const handleTrackLyricsSelect = (index: number, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      event.target.value = "";
+      return;
+    }
+
+    const isJson = file.type === "application/json" || file.name.toLowerCase().endsWith(".json");
+    if (!isJson) {
+      event.target.value = "";
+      return;
+    }
+
+    setTrackSelections((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, lyricsFile: file } : item)),
+    );
+    event.target.value = "";
+  };
+
+  const handleTrackPreviewToggle = () => {
+    const audio = trackAudioRef.current;
+    if (!audio || !trackAudioUrl) return;
+    if (audio.paused) {
+      void audio.play().catch(() => {
+        setTrackPreviewPlaying(false);
+      });
+      return;
+    }
+    audio.pause();
+  };
+
+  const handleTrackPreviewStop = () => {
+    const audio = trackAudioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setTrackPreviewPlaying(false);
+    setTrackPreviewCurrentTime(0);
+  };
+
+  const handleTrackPreviewSeek = (event: ChangeEvent<HTMLInputElement>) => {
+    const audio = trackAudioRef.current;
+    if (!audio) return;
+    const nextTime = Number(event.target.value);
+    if (!Number.isFinite(nextTime)) return;
+    audio.currentTime = nextTime;
+    setTrackPreviewCurrentTime(nextTime);
+  };
+
   const handleArtistInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (!isShortcutPressed(event, APP_SHORTCUTS.CONFIRM_WITH_ENTER)) return;
     event.preventDefault();
 
     if (artistOptions.length > 0) {
@@ -627,7 +803,7 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
   };
 
   const handleAlbumTitleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (!isShortcutPressed(event, APP_SHORTCUTS.CONFIRM_WITH_ENTER)) return;
     event.preventDefault();
 
     if (albumTitleOptions.length > 0) {
@@ -641,7 +817,7 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
   };
 
   const handleGenreInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
+    if (!isShortcutPressed(event, APP_SHORTCUTS.CONFIRM_WITH_ENTER)) return;
     event.preventDefault();
 
     if (filteredGenreOptions.length > 0) {
@@ -1054,6 +1230,119 @@ export function AddMusicOverlay({ open, onClose }: AddMusicOverlayProps) {
                   <input className="music-add-overlay-input" placeholder="ID do album" />
                   <input className="music-add-overlay-input" placeholder="Titulo da faixa" />
                   <input className="music-add-overlay-input" placeholder="Chave do audio (R2)" />
+                  <div className="music-add-overlay-field" data-no-drag="true">
+                    <input
+                      ref={trackAudioInputRef}
+                      type="file"
+                      accept="audio/*"
+                      multiple
+                      className="music-add-overlay-file-input"
+                      onChange={handleTrackAudioSelect}
+                    />
+                    <button
+                      type="button"
+                      className="music-add-overlay-suggestion-btn music-add-overlay-audio-picker"
+                      onClick={() => trackAudioInputRef.current?.click()}
+                      data-no-drag="true"
+                    >
+                      {trackSelections.length > 0 ? "Adicionar musicas" : "Selecionar musicas"}
+                    </button>
+                    <p className="music-add-overlay-helper">
+                      {trackSelections.length > 0
+                        ? `${trackSelections.length} musica(s) selecionada(s).`
+                        : "Nenhuma musica selecionada."}
+                    </p>
+                    {trackSelections.length > 0 ? (
+                      <div className="music-add-overlay-track-list" data-no-drag="true">
+                        {trackSelections.map((item, index) => {
+                          const isActive = index === activeTrackAudioIndex;
+                          return (
+                            <div
+                              key={`${item.audioFile.name}-${item.audioFile.size}-${item.audioFile.lastModified}`}
+                              className={`music-add-overlay-track-item${isActive ? " is-active" : ""}`}
+                            >
+                              <button
+                                type="button"
+                                className="music-add-overlay-track-item-select"
+                                onClick={() => handleSelectTrackAudioForPreview(index)}
+                              >
+                                {`${index + 1}. ${item.audioFile.name}`}
+                              </button>
+                              <div className="music-add-overlay-track-item-actions" data-no-drag="true">
+                                {isActive ? (
+                                  <>
+                                    <input
+                                      id={`track-lyrics-input-${index}`}
+                                      type="file"
+                                      accept=".json,application/json"
+                                      className="music-add-overlay-file-input"
+                                      onChange={(event) => handleTrackLyricsSelect(index, event)}
+                                    />
+                                    <label
+                                      htmlFor={`track-lyrics-input-${index}`}
+                                      className="music-add-overlay-track-item-lyrics-btn"
+                                    >
+                                      {item.lyricsFile ? "Trocar lyrics" : "Lyrics JSON"}
+                                    </label>
+                                  </>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="music-add-overlay-track-item-remove"
+                                  onClick={() => handleRemoveTrackAudio(index)}
+                                  aria-label={`Remover ${item.audioFile.name}`}
+                                >
+                                  x
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    {trackSelections[activeTrackAudioIndex]?.lyricsFile ? (
+                      <p className="music-add-overlay-helper">
+                        {`Lyrics ativo: ${trackSelections[activeTrackAudioIndex].lyricsFile?.name}`}
+                      </p>
+                    ) : null}
+                    <div className="music-add-overlay-audio-controls" data-no-drag="true">
+                      <button
+                        type="button"
+                        className="music-add-overlay-suggestion-btn"
+                        onClick={handleTrackPreviewToggle}
+                        disabled={!trackAudioUrl}
+                      >
+                        {trackPreviewPlaying ? "Pause" : "Play"}
+                      </button>
+                      <button
+                        type="button"
+                        className="music-add-overlay-suggestion-btn"
+                        onClick={handleTrackPreviewStop}
+                        disabled={!trackAudioUrl}
+                      >
+                        Stop
+                      </button>
+                      <input
+                        type="range"
+                        className="music-add-overlay-audio-seek"
+                        min={0}
+                        max={Math.max(trackPreviewDuration, 0)}
+                        step="0.1"
+                        value={Math.min(trackPreviewCurrentTime, trackPreviewDuration || 0)}
+                        onChange={handleTrackPreviewSeek}
+                        disabled={!trackAudioUrl}
+                      />
+                      <span className="music-add-overlay-audio-time">
+                        {formatAudioTime(trackPreviewCurrentTime)} / {formatAudioTime(trackPreviewDuration)}
+                      </span>
+                    </div>
+                    <audio
+                      ref={trackAudioRef}
+                      className="music-add-overlay-audio-native"
+                      src={trackAudioUrl ?? undefined}
+                      preload="metadata"
+                    />
+                  </div>
                   <MediaAttachField
                     inputId="track-cover-attach"
                     file={trackCoverFile}
