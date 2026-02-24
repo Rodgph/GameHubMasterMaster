@@ -34,6 +34,7 @@
   font-size: 12px;
   flex: 1 1 240px;
   min-width: 180px;
+  
 }
 
 .feed-header-post-input::placeholder {
@@ -70,9 +71,14 @@
   font-size: 11px;
 }
 
+.feed-header-file-hint.is-error {
+  color: #ff6b6b;
+}
+
 .feed-home-content {
   flex: 1;
   min-height: 0;
+  overflow: auto;
   border-radius: 14px;
   background: #0b0b0b;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -128,7 +134,6 @@
 .feed-comments-actions,
 .feed-comment-actions,
 .feed-post-header,
-.feed-list-header,
 .feed-modal-header {
   display: flex;
   align-items: center;
@@ -179,11 +184,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.feed-list-header {
-  justify-content: space-between;
-  color: var(--text-secondary);
 }
 
 .feed-post-card {

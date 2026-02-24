@@ -4,12 +4,14 @@ import { useFeedStore } from "./feedStore";
 import { CommentSection } from "./CommentSection";
 import { ReactionPicker } from "./ReactionPicker";
 import { PostVersionsModal } from "./PostVersionsModal";
+import { useSessionStore } from "../../core/stores/sessionStore";
 
 type Props = {
   post: FeedPost;
 };
 
 export function PostCard({ post }: Props) {
+  const currentUserId = useSessionStore((state) => state.user?.id ?? null);
   const [showComments, setShowComments] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
@@ -90,15 +92,19 @@ export function PostCard({ post }: Props) {
         >
           Reagir
         </button>
-        <button data-no-drag="true" type="button" onClick={() => setIsEditing((value) => !value)}>
-          Editar
-        </button>
+        {currentUserId === post.user_id ? (
+          <button data-no-drag="true" type="button" onClick={() => setIsEditing((value) => !value)}>
+            Editar
+          </button>
+        ) : null}
         <button data-no-drag="true" type="button" onClick={() => setActivePostId(post.id)}>
           ...
         </button>
-        <button data-no-drag="true" type="button" onClick={() => void deletePost(post.id)}>
-          Remover
-        </button>
+        {currentUserId === post.user_id ? (
+          <button data-no-drag="true" type="button" onClick={() => void deletePost(post.id)}>
+            Remover
+          </button>
+        ) : null}
       </div>
       <div className="feed-reactions-row">
         {Object.entries(post.reactions).map(([emoji, users]) => (

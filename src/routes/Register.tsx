@@ -1,7 +1,8 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSessionStore } from "../core/stores/sessionStore";
+import { AvatarCircle } from "../shared/ui";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -10,8 +11,21 @@ export function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarUrl(String(reader.result ?? ""));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -56,12 +70,17 @@ export function RegisterPage() {
           placeholder="******"
           autoComplete="new-password"
         />
-        <label htmlFor="avatar-url">Avatar URL (opcional)</label>
+        <label>Avatar (opcional)</label>
+        <button type="button" className="auth-avatar-picker" onClick={() => avatarInputRef.current?.click()}>
+          <AvatarCircle src={avatarUrl || undefined} alt={displayName || username || "avatar"} size={72} />
+          <span className="auth-avatar-picker-text">{avatarUrl ? "Trocar avatar" : "Selecionar avatar"}</span>
+        </button>
         <input
-          id="avatar-url"
-          value={avatarUrl}
-          onChange={(event) => setAvatarUrl(event.target.value)}
-          placeholder="https://..."
+          ref={avatarInputRef}
+          type="file"
+          className="authHiddenFileInput"
+          accept="image/*"
+          onChange={handleAvatarFileChange}
         />
         {error ? <p className="auth-error">{error}</p> : null}
         <button type="submit" disabled={loading}>

@@ -22,7 +22,12 @@ export function PostComposer() {
       upsert: false,
       contentType: selected.type || "image/jpeg",
     });
-    if (upload.error) throw upload.error;
+    if (upload.error) {
+      // log full upload result for debugging
+      // eslint-disable-next-line no-console
+      console.error("supabase upload error", upload);
+      throw new Error(upload.error.message || "Falha ao enviar imagem (supabase)");
+    }
 
     const publicData = supabase.storage.from("feed-images").getPublicUrl(upload.data.path).data;
     return publicData.publicUrl;

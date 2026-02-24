@@ -1,0 +1,12 @@
+.back-button {
+  width: 5px;
+  height: 100%;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background: #fff;
+  border: none;
+  padding: 0;
+  display: block;
+  flex-shrink: 0;
+  cursor: pointer;
+}

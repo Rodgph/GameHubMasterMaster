@@ -1,3 +1,4 @@
+import { cloudApiFetch } from "../../../core/services/cloudflareApi";
 import { getSupabaseClient } from "../../../core/services/supabase";
 
 export type ChatUser = {
@@ -12,16 +13,46 @@ export type ChatProfile = {
   avatar_url: string | null;
 };
 
-export async function fetchChatUsers(): Promise<ChatUser[]> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("chat_profiles")
-    .select("id, username, avatar_url")
-    .order("created_at", { ascending: false })
-    .limit(50);
+type CloudApiUser = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+};
 
-  if (error) throw error;
-  return (data ?? []) as ChatUser[];
+async function getAccessToken() {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new Error("Sessao invalida.");
+  }
+  return token;
+}
+
+function mapToChatUser(user: CloudApiUser): ChatUser {
+  return {
+    id: user.id,
+    username: user.username,
+    avatar_url: user.avatar_url,
+  };
+}
+
+function mapToChatProfile(user: CloudApiUser): ChatProfile {
+  return {
+    id: user.id,
+    username: user.username,
+    avatar_url: user.avatar_url,
+  };
+}
+
+export async function fetchChatUsers(): Promise<ChatUser[]> {
+  const token = await getAccessToken();
+  const result = await cloudApiFetch<{ users: CloudApiUser[] }>("/users?limit=50", token, {
+    method: "GET",
+  });
+  return result.users.map(mapToChatUser);
 }
 
 export async function searchChatUsers(query: string, limit = 20): Promise<ChatUser[]> {
@@ -29,28 +60,43 @@ export async function searchChatUsers(query: string, limit = 20): Promise<ChatUs
   if (!term) return [];
 
   const safeLimit = Math.max(1, Math.min(50, Math.floor(limit)));
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("chat_profiles")
-    .select("id, username, avatar_url")
-    .ilike("username", `%${term}%`)
-    .order("username", { ascending: true })
-    .limit(safeLimit);
-
-  if (error) throw error;
-  return (data ?? []) as ChatUser[];
+  const token = await getAccessToken();
+  const result = await cloudApiFetch<{ users: CloudApiUser[] }>(
+    `/users?q=${encodeURIComponent(term)}&limit=${safeLimit}`,
+    token,
+    {
+      method: "GET",
+    },
+  );
+  return result.users.map(mapToChatUser);
 }
 
 export async function getChatProfileById(userId: string): Promise<ChatProfile | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("chat_profiles")
-    .select("id, username, avatar_url")
-    .eq("id", userId)
-    .maybeSingle();
+  const token = await getAccessToken();
+  const result = await cloudApiFetch<{ user: CloudApiUser | null }>(
+    `/users/${encodeURIComponent(userId)}`,
+    token,
+    {
+      method: "GET",
+    },
+  );
+  if (!result.user) return null;
+  return mapToChatProfile(result.user);
+}
 
-  if (error) throw error;
-  return (data ?? null) as ChatProfile | null;
+export async function getChatProfilesByIds(userIds: string[]): Promise<ChatProfile[]> {
+  const ids = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const token = await getAccessToken();
+  const result = await cloudApiFetch<{ users: CloudApiUser[] }>(
+    `/users/by-ids?ids=${encodeURIComponent(ids.join(","))}`,
+    token,
+    {
+      method: "GET",
+    },
+  );
+  return result.users.map(mapToChatProfile);
 }
 
 export async function updateMyChatProfile(params: {
@@ -58,25 +104,23 @@ export async function updateMyChatProfile(params: {
   username: string;
   avatarUrl: string | null;
 }) {
-  const supabase = getSupabaseClient();
+  void params.userId;
   const username = params.username.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(username)) {
     throw new Error("Username deve ter 3-20 caracteres [a-z0-9_].");
   }
 
-  const { data, error } = await supabase
-    .from("chat_profiles")
-    .upsert(
-      {
-        id: params.userId,
+  const token = await getAccessToken();
+  const result = await cloudApiFetch<{ user: CloudApiUser }>(
+    "/users/me",
+    token,
+    {
+      method: "PUT",
+      body: JSON.stringify({
         username,
-        avatar_url: params.avatarUrl,
-      },
-      { onConflict: "id" },
-    )
-    .select("id, username, avatar_url")
-    .single();
-
-  if (error) throw error;
-  return data as ChatProfile;
+        avatarUrl: params.avatarUrl,
+      }),
+    },
+  );
+  return mapToChatProfile(result.user);
 }

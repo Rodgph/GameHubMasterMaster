@@ -5,6 +5,7 @@ import { RealtimeDO } from "./realtime";
 import { handleChatRoutes } from "./routes/chat";
 import { handleFeedRoutes } from "./routes/feed";
 import { handleMusicRoutes } from "./routes/music";
+import { handleUserRoutes } from "./routes/users";
 
 type Env = {
   DB: D1Database;
@@ -317,6 +318,16 @@ const worker: ExportedHandler<Env> = {
       });
       if (chatResponse) {
         return chatResponse;
+      }
+
+      const usersResponse = await handleUserRoutes({
+        request,
+        env,
+        userId: verified.userId,
+        json,
+      });
+      if (usersResponse) {
+        return usersResponse;
       }
 
       const feedResponse = await handleFeedRoutes({

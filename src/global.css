@@ -67,6 +67,26 @@ button:focus-visible {
   color: var(--text-primary);
 }
 
+.auth-avatar-picker {
+  height: auto !important;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.auth-avatar-picker-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.authHiddenFileInput {
+  display: none;
+}
+
 .auth-error {
   margin: 0;
   color: #ff6b6b;

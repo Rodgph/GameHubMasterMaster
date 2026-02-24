@@ -6,7 +6,6 @@ export function PostList() {
   const posts = useFeedStore((state) => state.posts);
   const loadPosts = useFeedStore((state) => state.loadPosts);
   const userFilterId = useFeedStore((state) => state.userFilterId);
-  const setUserFilterId = useFeedStore((state) => state.setUserFilterId);
   const filteredPosts = useMemo(
     () => (userFilterId ? posts.filter((post) => post.user_id === userFilterId) : posts),
     [posts, userFilterId],
@@ -18,14 +17,6 @@ export function PostList() {
 
   return (
     <div className="feed-list" data-no-drag="true">
-      <div className="feed-list-header">
-        <span>{filteredPosts.length} posts</span>
-        {userFilterId ? (
-          <button data-no-drag="true" type="button" onClick={() => setUserFilterId(null)}>
-            Ver todos os posts
-          </button>
-        ) : null}
-      </div>
       {filteredPosts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}

@@ -146,6 +146,13 @@ export function addOpenConversation(conversation: OpenConversation): OpenConvers
   return normalized;
 }
 
+export function replaceOpenConversations(conversations: OpenConversation[]): OpenConversation[] {
+  if (typeof window === "undefined") return [];
+  const normalized = conversations.map(normalizeConversation);
+  saveOpenConversations(normalized);
+  return normalized;
+}
+
 export function removeOpenConversation(userId: string, roomId?: string): OpenConversation[] {
   if (typeof window === "undefined") return [];
   const next = getOpenConversations().filter((item) => item.userId !== userId);

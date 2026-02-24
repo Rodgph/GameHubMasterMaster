@@ -1,5 +1,6 @@
-﻿import { getSupabaseClient } from "../../../core/services/supabase";
+import { getSupabaseClient } from "../../../core/services/supabase";
 import { inferMessageTypeFromFile, uploadToChatMedia } from "./media.repository";
+import { getChatProfilesByIds } from "./users.repository";
 
 export type ChatMessageType = "text" | "image" | "audio" | "file";
 
@@ -60,7 +61,7 @@ async function requireUserId() {
   const supabase = getSupabaseClient();
   const session = await supabase.auth.getSession();
   const userId = session.data.session?.user.id;
-  if (!userId) throw new Error("SessÃ£o invÃ¡lida.");
+  if (!userId) throw new Error("Sessão inválida.");
   return userId;
 }
 
@@ -171,7 +172,7 @@ export async function sendMediaMessage(params: {
     )
     .single();
 
-  if (insert.error || !insert.data) throw new Error(insert.error?.message || "Falha ao enviar mÃ­dia.");
+  if (insert.error || !insert.data) throw new Error(insert.error?.message || "Falha ao enviar mídia.");
   return insert.data as ChatMessageRecord;
 }
 
@@ -187,7 +188,7 @@ export async function editMessage(messageId: string, newText: string) {
     .eq("id", messageId)
     .single();
 
-  if (current.error || !current.data) throw new Error(current.error?.message || "Mensagem nÃ£o encontrada.");
+  if (current.error || !current.data) throw new Error(current.error?.message || "Mensagem não encontrada.");
 
   const prevText = (current.data.body_text as string | null) ?? "";
   if (prevText !== text) {
@@ -197,7 +198,7 @@ export async function editMessage(messageId: string, newText: string) {
       editor_id: editorId,
       previous_text: prevText,
     });
-    if (insertHistory.error) throw new Error(insertHistory.error.message || "Falha ao salvar histÃ³rico.");
+    if (insertHistory.error) throw new Error(insertHistory.error.message || "Falha ao salvar histórico.");
   }
 
   const updated = await supabase
@@ -224,7 +225,7 @@ export async function getMessageEdits(messageId: string) {
     .eq("message_id", messageId)
     .order("created_at", { ascending: false });
 
-  if (list.error) throw new Error(list.error.message || "Falha ao listar histÃ³rico.");
+  if (list.error) throw new Error(list.error.message || "Falha ao listar histórico.");
   return (list.data ?? []) as ChatMessageEditRecord[];
 }
 
@@ -407,7 +408,7 @@ export async function toggleReaction(params: { messageId: string; roomId: string
   const supabase = getSupabaseClient();
   const userId = await requireUserId();
   const emoji = params.emoji.trim();
-  if (!emoji) throw new Error("Emoji invÃ¡lido.");
+  if (!emoji) throw new Error("Emoji inválido.");
 
   const existing = await supabase
     .from("chat_message_reactions")
@@ -419,7 +420,7 @@ export async function toggleReaction(params: { messageId: string; roomId: string
 
   if (existing.error) {
     if (isMissingReactionsTableError(existing.error)) return false;
-    throw new Error(existing.error.message || "Falha ao consultar reaÃ§Ã£o.");
+    throw new Error(existing.error.message || "Falha ao consultar reação.");
   }
 
   if (existing.data) {
@@ -431,7 +432,7 @@ export async function toggleReaction(params: { messageId: string; roomId: string
       .eq("emoji", emoji);
     if (remove.error) {
       if (isMissingReactionsTableError(remove.error)) return false;
-      throw new Error(remove.error.message || "Falha ao remover reaÃ§Ã£o.");
+      throw new Error(remove.error.message || "Falha ao remover reação.");
     }
     return false;
   }
@@ -461,7 +462,7 @@ export async function listMessageReactions(messageIds: string[]) {
 
   if (rows.error) {
     if (isMissingReactionsTableError(rows.error)) return {};
-    throw new Error(rows.error.message || "Falha ao listar reaÃ§Ãµes.");
+    throw new Error(rows.error.message || "Falha ao listar reações.");
   }
 
   const reactions = (rows.data ?? []) as ChatMessageReactionRecord[];
@@ -469,10 +470,9 @@ export async function listMessageReactions(messageIds: string[]) {
 
   let profileMap = new Map<string, ChatMessageReactionUser>();
   if (userIds.length > 0) {
-    const profiles = await supabase.from("chat_profiles").select("id, username, avatar_url").in("id", userIds);
-    if (profiles.error) throw new Error(profiles.error.message || "Falha ao buscar perfis das reaÃ§Ãµes.");
+    const profiles = await getChatProfilesByIds(userIds);
     profileMap = new Map(
-      ((profiles.data ?? []) as ChatMessageReactionUser[]).map((item) => [
+      (profiles as ChatMessageReactionUser[]).map((item) => [
         item.id,
         { id: item.id, username: item.username, avatar_url: item.avatar_url ?? null },
       ]),
@@ -510,5 +510,6 @@ export async function listMessageReactions(messageIds: string[]) {
   }
   return result;
 }
+
 
 

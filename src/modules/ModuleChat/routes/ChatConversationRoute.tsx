@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
 import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
+import { BackButton } from "../../../shared/ui";
 import { FiCopy, FiCornerUpLeft, FiEdit2, FiMapPin, FiPlus, FiStar, FiTrash2 } from "../../../shared/ui/icons";
 import { useChatStore } from "../chatStore";
 import { getGroupByRoomId, type GroupView } from "../data/groups.repository";
@@ -704,6 +705,12 @@ export function ChatConversationRoute() {
 
   return (
     <section className="chatConversationRoute" data-no-drag="true">
+      <BackButton
+        className="chat-global-back"
+        ariaLabel="Voltar"
+        onClick={() => navigate(-1)}
+        data-no-drag="true"
+      />
       <div className="chatConversationHeaderWrap" data-no-drag="true">
         {hasAuthorStory ? <ConversationHeader storyCount={1} activeStoryIndex={0} /> : null}
         <div className="chatConversationTopCard" data-no-drag="true">

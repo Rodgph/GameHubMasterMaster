@@ -123,7 +123,14 @@ export function ChatAccountRoute() {
       window.localStorage.setItem(`chat_account_bio_${user.id}`, bioText);
       setOkText("Perfil atualizado.");
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : "Falha ao salvar perfil.");
+      const message = error instanceof Error ? error.message : "Falha ao salvar perfil.";
+      if (message.includes("avatar_too_large")) {
+        setErrorText("Avatar muito grande. Escolha uma imagem menor.");
+      } else if (message.includes("username_unavailable")) {
+        setErrorText("Esse username ja esta em uso.");
+      } else {
+        setErrorText(message);
+      }
     } finally {
       setSaving(false);
     }

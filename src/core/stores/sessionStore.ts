@@ -39,6 +39,18 @@ type RealtimeModulesChanged = {
   payload: { modulesEnabled: ModulesEnabledMap };
 };
 
+type RealtimeUserUpdated = {
+  type: "user:updated";
+  payload: {
+    user: {
+      id: string;
+      username: string;
+      display_name: string | null;
+      avatar_url: string | null;
+    };
+  };
+};
+
 let realtimeSocket: WebSocket | null = null;
 let reconnectTimer: number | null = null;
 let reconnectAttempts = 0;
@@ -57,17 +69,20 @@ function clearRealtimeConnection(set: SessionSet) {
   reconnectAttempts = 0;
   activeRealtimeToken = "";
 
-  if (realtimeSocket) {
-    realtimeSocket.onclose = null;
-    realtimeSocket.onerror = null;
-    realtimeSocket.onmessage = null;
-    if (
-      realtimeSocket.readyState === WebSocket.OPEN ||
-      realtimeSocket.readyState === WebSocket.CONNECTING
-    ) {
-      realtimeSocket.close();
+  const socket = realtimeSocket;
+  realtimeSocket = null;
+  if (socket) {
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.close();
+    } else if (socket.readyState === WebSocket.CONNECTING) {
+      socket.onopen = () => {
+        socket.close();
+      };
     }
-    realtimeSocket = null;
   }
 
   set({ realtimeConnected: false });
@@ -125,31 +140,11 @@ function isUsernameUnavailableError(error: unknown) {
   if (!(error instanceof Error)) return false;
   const text = error.message.toLowerCase();
   return (
+    text.includes("username_unavailable") ||
     text.includes("duplicate key") ||
     text.includes("unique constraint") ||
-    text.includes("chat_profiles_username") ||
     text.includes("username")
   );
-}
-
-async function ensureChatProfile(
-  userId: string,
-  username: string,
-  avatarUrl: string | null | undefined,
-) {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from("chat_profiles").upsert(
-    {
-      id: userId,
-      username,
-      avatar_url: avatarUrl ?? null,
-    },
-    { onConflict: "id" },
-  );
-
-  if (error) {
-    throw new Error(error.message);
-  }
 }
 
 async function syncFromCloud(
@@ -183,15 +178,33 @@ function connectRealtime(token: string, set: SessionSet, get: () => SessionStore
 
     ws.onmessage = (event) => {
       try {
-        const parsed = JSON.parse(String(event.data)) as RealtimeModulesChanged;
-        if (parsed.type !== "modules:changed") return;
+        const parsed = JSON.parse(String(event.data)) as RealtimeModulesChanged | RealtimeUserUpdated;
 
-        const merged = mergeModulesMap(parsed.payload.modulesEnabled);
-        useLayoutStore.getState().applyEnabledModules(merged);
-        set(() => ({
-          modulesEnabled: merged,
-          isSynced: true,
-        }));
+        if (parsed.type === "modules:changed") {
+          const merged = mergeModulesMap(parsed.payload.modulesEnabled);
+          useLayoutStore.getState().applyEnabledModules(merged);
+          set(() => ({
+            modulesEnabled: merged,
+            isSynced: true,
+          }));
+          return;
+        }
+
+        if (parsed.type === "user:updated") {
+          const currentUser = get().user;
+          const nextUser = parsed.payload?.user;
+          if (!currentUser || !nextUser || currentUser.id !== nextUser.id) return;
+
+          set(() => ({
+            user: {
+              ...currentUser,
+              username: nextUser.username,
+              display_name: nextUser.display_name,
+              avatar_url: nextUser.avatar_url,
+            },
+            lastUsername: nextUser.username,
+          }));
+        }
       } catch {
         // ignore malformed payloads
       }
@@ -331,22 +344,15 @@ export const useSessionStore = create<SessionStore>()(
           token = signin.data.session.access_token;
         }
 
-        const currentSession = await supabaseClient.auth.getSession();
-        const userId = currentSession.data.session?.user.id;
-        if (!userId) {
-          throw new Error("Falha ao obter usuario da sessao.");
-        }
-
+        let boot: Awaited<ReturnType<typeof syncFromCloud>>;
         try {
-          await ensureChatProfile(userId, username, avatarUrl ?? null);
-        } catch (profileError) {
-          if (isUsernameUnavailableError(profileError)) {
+          boot = await syncFromCloud(token, username, displayName, avatarUrl ?? null);
+        } catch (bootstrapError) {
+          if (isUsernameUnavailableError(bootstrapError)) {
             throw new Error("username_unavailable");
           }
-          throw profileError;
+          throw bootstrapError;
         }
-
-        const boot = await syncFromCloud(token, username, displayName, avatarUrl ?? null);
         const mergedModules = mergeModulesMap(boot.modulesEnabled);
         useLayoutStore.getState().applyEnabledModules(mergedModules);
         connectRealtime(token, set, get);

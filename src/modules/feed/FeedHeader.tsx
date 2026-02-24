@@ -1,16 +1,66 @@
 import { useState } from "react";
 import { AvatarCircle } from "../../shared/ui";
 import { useSessionStore } from "../../core/stores/sessionStore";
-import { BsGeoAlt, FaImages, IoMdAttach, IoMdMusicalNote } from "../../shared/ui/icons";
+import { getSupabaseClient } from "../../core/services/supabase";
+import { BsGeoAlt, FaImages, IoMdAttach, IoMdMusicalNote, LuSend } from "../../shared/ui/icons";
+import { useFeedStore } from "./feedStore";
 
 export function FeedHeader() {
   const user = useSessionStore((state) => state.user);
+  const addPost = useFeedStore((state) => state.addPost);
   const [postText, setPostText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [musicFile, setMusicFile] = useState<File | null>(null);
   const [locationText, setLocationText] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedbackText, setFeedbackText] = useState<string | null>(null);
+
+  async function uploadImage(selected: File) {
+    if (!user) throw new Error("Usuario nao autenticado.");
+    const supabase = getSupabaseClient();
+    const extension = selected.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+
+    const upload = await supabase.storage.from("feed-images").upload(path, selected, {
+      upsert: false,
+      contentType: selected.type || "image/jpeg",
+    });
+    if (upload.error) {
+      // log full upload result for debugging
+      // eslint-disable-next-line no-console
+      console.error("supabase upload error", upload);
+      throw new Error(upload.error.message || "Falha ao enviar imagem (supabase)");
+    }
+
+    const publicData = supabase.storage.from("feed-images").getPublicUrl(upload.data.path).data;
+    return publicData.publicUrl;
+  }
+
+  const handlePublish = async () => {
+    const text = postText.trim();
+    if (!text || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setFeedbackText(null);
+    try {
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+      await addPost(text, imageUrl);
+      setPostText("");
+      setImageFile(null);
+      setAttachFile(null);
+      setMusicFile(null);
+      setLocationText(null);
+    } catch (error) {
+      setFeedbackText(error instanceof Error ? error.message : "Falha ao criar post.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSelectLocation = () => {
     if (!navigator.geolocation) {
@@ -44,6 +94,12 @@ export function FeedHeader() {
           placeholder="what is happening?"
           value={postText}
           onChange={(event) => setPostText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void handlePublish();
+            }
+          }}
           data-no-drag="true"
           aria-label="Escrever post"
         />
@@ -84,11 +140,25 @@ export function FeedHeader() {
         >
           <BsGeoAlt size={14} />
         </button>
+        <button
+          type="button"
+          className="feed-header-action-btn"
+          data-no-drag="true"
+          title={isSubmitting ? "Publicando" : "Publicar"}
+          onClick={() => {
+            void handlePublish();
+          }}
+          disabled={isSubmitting || !postText.trim()}
+          aria-label="Publicar post"
+        >
+          <LuSend size={14} />
+        </button>
       </div>
       {imageFile ? <p className="feed-header-file-hint">{`Imagem: ${imageFile.name}`}</p> : null}
       {attachFile ? <p className="feed-header-file-hint">{`Arquivo: ${attachFile.name}`}</p> : null}
       {musicFile ? <p className="feed-header-file-hint">{`Musica: ${musicFile.name}`}</p> : null}
       {locationText ? <p className="feed-header-file-hint">{`Localizacao: ${locationText}`}</p> : null}
+      {feedbackText ? <p className="feed-header-file-hint is-error">{feedbackText}</p> : null}
     </header>
   );
 }

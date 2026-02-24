@@ -154,13 +154,21 @@ function clearSocket(set: (partial: Partial<FeedStore>) => void, keepToken = fal
   }
   reconnectAttempt = 0;
   if (!keepToken) reconnectToken = "";
-  if (ws) {
-    ws.onopen = null;
-    ws.onclose = null;
-    ws.onerror = null;
-    ws.onmessage = null;
-    ws.close();
-    ws = null;
+  const socket = ws;
+  ws = null;
+  if (socket) {
+    socket.onopen = null;
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.close();
+    } else if (socket.readyState === WebSocket.CONNECTING) {
+      socket.onopen = () => {
+        socket.close();
+      };
+    }
   }
   set({ wsStatus: "disconnected" });
 }
@@ -195,7 +203,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       method: "POST",
       body: JSON.stringify({ body, image_url: imageUrl ?? null }),
     });
-    set((state) => ({ posts: [data.post, ...state.posts] }));
+    set((state) => ({ posts: mergeById(state.posts, [data.post]) }));
   },
   editPost: async (postId, body) => {
     const token = await getAccessToken();
@@ -341,8 +349,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   applyWsEvent: (event) => {
     set((state) => {
       if (event.type === "feed:post_new") {
-        const exists = state.posts.some((post) => post.id === event.payload.post.id);
-        return exists ? state : { posts: [event.payload.post, ...state.posts] };
+        return { posts: mergeById(state.posts, [event.payload.post]) };
       }
 
       if (event.type === "feed:post_edit") {

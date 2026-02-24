@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../../../core/services/supabase";
+import { getChatProfilesByIds } from "./users.repository";
 
 type FollowUserParams = {
   followerId: string;
@@ -53,14 +54,5 @@ export async function fetchFollowedProfiles(followerId: string): Promise<Followe
   const followedIds = (followsResult.data ?? []).map((item) => item.followed_id as string);
   if (followedIds.length === 0) return [];
 
-  const profilesResult = await supabase
-    .from("chat_profiles")
-    .select("id, username, avatar_url")
-    .in("id", followedIds);
-
-  if (profilesResult.error) {
-    throw new Error(profilesResult.error.message || "Falha ao carregar perfis seguidos.");
-  }
-
-  return (profilesResult.data ?? []) as FollowedProfile[];
+  return (await getChatProfilesByIds(followedIds)) as FollowedProfile[];
 }

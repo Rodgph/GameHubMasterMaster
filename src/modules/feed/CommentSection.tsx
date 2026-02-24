@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFeedStore } from "./feedStore";
+
+const EMPTY: any[] = [];
 
 type Props = {
   postId: string;
@@ -8,7 +10,8 @@ type Props = {
 export function CommentSection({ postId }: Props) {
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const comments = useFeedStore((state) => state.commentsByPostId[postId] ?? []);
+  const selectComments = useCallback((s: any) => s.commentsByPostId[postId] ?? EMPTY, [postId]);
+  const comments = useFeedStore(selectComments);
   const loadComments = useFeedStore((state) => state.loadComments);
   const addComment = useFeedStore((state) => state.addComment);
   const deleteComment = useFeedStore((state) => state.deleteComment);

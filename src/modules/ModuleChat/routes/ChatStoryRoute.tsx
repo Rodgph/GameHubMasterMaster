@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ContextMenuBase, type ContextMenuBaseItem } from "../../../components/ContextMenuBase/ContextMenuBase";
-import { getSupabaseClient } from "../../../core/services/supabase";
 import { useSessionStore } from "../../../core/stores/sessionStore";
 import { BaseIconButton } from "../../../shared/ui";
 import { FaPause, FaPlay, FiTrash2 } from "../../../shared/ui/icons";
 import { StoryCreateHeader, StoryReplyFooter } from "../components";
+import { getChatProfileById } from "../data/users.repository";
 import { ConversationHeader } from "./conversation/components";
 import {
   createStoryMedia,
@@ -58,14 +58,14 @@ export function ChatStoryRoute() {
     if (!userId || isCreateMode) return;
     let active = true;
     const run = async () => {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase
-        .from("chat_profiles")
-        .select("username, avatar_url")
-        .eq("id", userId)
-        .single();
-      if (!active) return;
-      setProfile((data ?? null) as StoryProfile | null);
+      try {
+        const userProfile = await getChatProfileById(userId);
+        if (!active) return;
+        setProfile(userProfile ? { username: userProfile.username, avatar_url: userProfile.avatar_url } : null);
+      } catch {
+        if (!active) return;
+        setProfile(null);
+      }
 
       try {
         const list = await listActiveStoriesForUser(userId);

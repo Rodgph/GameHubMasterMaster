@@ -21,13 +21,14 @@ import { getOrCreateDMRoom } from "../data/dm.repository";
 import { followUser, unfollowUser } from "../data/follows.repository";
 import { createGroupRoom } from "../data/groups.repository";
 import { listActiveStoriesByUserIds } from "../data/stories.repository";
-import { searchChatUsers, type ChatUser } from "../data/users.repository";
+import { getChatProfilesByIds, searchChatUsers, type ChatUser } from "../data/users.repository";
 import { useFollowedProfiles } from "../hooks/useFollowedProfiles";
 import {
   addOpenConversation,
   getOpenConversations,
   markRead,
   markUnread,
+  replaceOpenConversations,
   removeOpenConversation,
   shouldKeepConversationRemoved,
   toggleMuted,
@@ -117,10 +118,67 @@ export function ChatHomeLayout() {
         try {
           const parsed = JSON.parse(String(event.data)) as {
             type?: string;
-            payload?: { roomId?: string; senderId?: string };
+            payload?: {
+              roomId?: string;
+              senderId?: string;
+              user?: {
+                id: string;
+                username: string;
+                avatar_url: string | null;
+              };
+            };
           };
           if (parsed.type === "room_updated") {
             scheduleRefresh();
+            return;
+          }
+
+          if (parsed.type === "user:updated") {
+            const updatedUser = parsed.payload?.user;
+            if (!updatedUser) return;
+
+            setOpenConversations((previous) => {
+              let changed = false;
+              const next = previous.map((conversation) => {
+                if (conversation.type === "group" || conversation.userId !== updatedUser.id) {
+                  return conversation;
+                }
+
+                const nextAvatarUrl = updatedUser.avatar_url ?? undefined;
+                if (
+                  conversation.username === updatedUser.username &&
+                  conversation.avatarUrl === nextAvatarUrl
+                ) {
+                  return conversation;
+                }
+
+                changed = true;
+                return {
+                  ...conversation,
+                  username: updatedUser.username,
+                  avatarUrl: nextAvatarUrl,
+                };
+              });
+
+              if (!changed) return previous;
+              return replaceOpenConversations(next);
+            });
+
+            setSearchedUsers((previous) => {
+              let changed = false;
+              const next = previous.map((user) => {
+                if (user.id !== updatedUser.id) return user;
+                changed = true;
+                return {
+                  ...user,
+                  username: updatedUser.username,
+                  avatar_url: updatedUser.avatar_url,
+                };
+              });
+              return changed ? next : previous;
+            });
+
+            void refreshFollowedProfiles();
           }
         } catch {
           // ignore malformed payload
@@ -134,7 +192,7 @@ export function ChatHomeLayout() {
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
       ws?.close();
     };
-  }, [currentUserId, loadRooms]);
+  }, [currentUserId, loadRooms, refreshFollowedProfiles]);
 
   useEffect(() => {
     if (!currentUserId || rooms.length === 0) return;
@@ -161,21 +219,16 @@ export function ChatHomeLayout() {
 
     let active = true;
     const run = async () => {
-      const supabase = getSupabaseClient();
       const peerIds = [...new Set(dmEntries.map((item) => item.peerId))];
-      const profilesResult = await supabase
-        .from("chat_profiles")
-        .select("id, username, avatar_url")
-        .in("id", peerIds);
+      let profiles: Array<{ id: string; username: string; avatar_url: string | null }> = [];
+      try {
+        profiles = await getChatProfilesByIds(peerIds);
+      } catch {
+        if (!active) return;
+        return;
+      }
 
       if (!active) return;
-      if (profilesResult.error) return;
-
-      const profiles = (profilesResult.data ?? []) as Array<{
-        id: string;
-        username: string;
-        avatar_url: string | null;
-      }>;
       const profileById = new Map(profiles.map((profile) => [profile.id, profile] as const));
 
       let changed = false;
